@@ -9,6 +9,8 @@ from typing import Tuple
 from dotenv import load_dotenv
 from playwright.sync_api import BrowserContext, Page, sync_playwright
 
+from automation.utils.system_resolution import get_system_resolution
+
 # Base directory for automation backend
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -277,10 +279,13 @@ def run_gmail_session(force_renew: bool = False, headless: bool = False) -> None
             "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         )
 
+        # Get system resolution for viewport
+        viewport = get_system_resolution()
+
         context = p.chromium.launch_persistent_context(
             user_data_dir=str(CONTEXT_PATH),
             headless=headless,
-            # viewport={"width": 1920, "height": 1080},
+            viewport=viewport,
             user_agent=user_agent,
             args=[
                 "--disable-blink-features=AutomationControlled",
