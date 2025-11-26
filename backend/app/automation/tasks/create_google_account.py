@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import random
 import re
 import sys
@@ -8,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from dotenv import load_dotenv
-from playwright.sync_api import Page
+from playwright.async_api import Page
 
 # Add parent directory to path to import from app.utils
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -129,7 +130,7 @@ def save_to_mongodb(account_data: Dict) -> bool:
         return False
 
 
-def create_google_account(
+async def create_google_account(
     page: Page,
     first_name: Optional[str] = None,
     last_name: Optional[str] = None,
@@ -199,47 +200,47 @@ def create_google_account(
 
         # Step 1: Go to Google.com
         print("[*] Navigating to Google.com...")
-        page.goto(
+        await page.goto(
             "https://www.google.com/", wait_until="domcontentloaded", timeout=60_000
         )
-        time.sleep(random.uniform(1.0, 2.0))
+        await asyncio.sleep(random.uniform(1.0, 2.0))
 
         # Step 2: Click Sign in
         print("[*] Clicking Sign in...")
-        page.get_by_role("link", name="Sign in").click()
-        time.sleep(random.uniform(2.0, 3.0))
+        await page.get_by_role("link", name="Sign in").click()
+        await asyncio.sleep(random.uniform(2.0, 3.0))
 
         # Step 3: Click Create account
         print("[*] Clicking Create account...")
-        page.get_by_role("button", name="Create account").click()
-        time.sleep(random.uniform(1.0, 2.0))
+        await page.get_by_role("button", name="Create account").click()
+        await asyncio.sleep(random.uniform(1.0, 2.0))
 
         # Step 4: Click "For my personal use"
         print("[*] Selecting 'For my personal use'...")
-        page.get_by_text("For my personal use").click()
-        time.sleep(random.uniform(1.5, 2.5))
+        await page.get_by_text("For my personal use").click()
+        await asyncio.sleep(random.uniform(1.5, 2.5))
 
         # Step 5: First Name
         print(f"[*] Entering first name: {first_name}...")
         first_name_input = page.get_by_role("textbox", name="First name")
-        first_name_input.wait_for(timeout=15_000)
-        first_name_input.click()
-        time.sleep(random.uniform(0.3, 0.7))
-        first_name_input.fill(first_name)
-        time.sleep(random.uniform(0.3, 0.7))
-        first_name_input.press("Tab")
-        time.sleep(random.uniform(0.5, 1.0))
+        await first_name_input.wait_for(timeout=15_000)
+        await first_name_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await first_name_input.fill(first_name)
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await first_name_input.press("Tab")
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Step 6: Last Name
         print(f"[*] Entering last name: {last_name}...")
         last_name_input = page.get_by_role("textbox", name="Last name (optional)")
-        last_name_input.fill(last_name)
-        time.sleep(random.uniform(0.5, 1.0))
+        await last_name_input.fill(last_name)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Step 7: Click Next
         print("[*] Clicking Next...")
-        page.get_by_role("button", name="Next").click()
-        time.sleep(random.uniform(2.0, 3.5))
+        await page.get_by_role("button", name="Next").click()
+        await asyncio.sleep(random.uniform(2.0, 3.5))
 
         # Step 8: Birthday and Gender
         print("[*] Entering birthday and gender...")
@@ -247,62 +248,62 @@ def create_google_account(
         # Select month
         print(f"[*] Selecting month: {month_name}...")
         month_dropdown = page.locator(".VfPpkd-aPP78e").first
-        month_dropdown.wait_for(timeout=10_000)
-        month_dropdown.click()
-        time.sleep(random.uniform(0.5, 1.0))
-        page.get_by_role("option", name=month_name).click()
-        time.sleep(random.uniform(0.5, 1.0))
+        await month_dropdown.wait_for(timeout=10_000)
+        await month_dropdown.click()
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        await page.get_by_role("option", name=month_name).click()
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Enter day
         print(f"[*] Entering day: {birthday_day}...")
         day_input = page.get_by_role("textbox", name="Day")
-        day_input.click()
-        time.sleep(random.uniform(0.3, 0.7))
-        day_input.fill(str(birthday_day))
-        time.sleep(random.uniform(0.5, 1.0))
+        await day_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await day_input.fill(str(birthday_day))
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Enter year
         print(f"[*] Entering year: {birthday_year}...")
         year_input = page.get_by_role("textbox", name="Year")
-        year_input.click()
-        time.sleep(random.uniform(0.3, 0.7))
-        year_input.fill(str(birthday_year))
-        time.sleep(random.uniform(0.5, 1.0))
+        await year_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await year_input.fill(str(birthday_year))
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Select gender
         print(f"[*] Selecting gender: {gender}...")
         gender_dropdown = page.locator(
             "#gender > .VfPpkd-O1htCb > .VfPpkd-TkwUic > .VfPpkd-aPP78e"
         )
-        gender_dropdown.click()
-        time.sleep(random.uniform(0.5, 1.0))
-        page.get_by_role("option", name=gender, exact=True).click()
-        time.sleep(random.uniform(0.5, 1.0))
+        await gender_dropdown.click()
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        await page.get_by_role("option", name=gender, exact=True).click()
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Click Next
         print("[*] Clicking Next for birthday/gender...")
-        page.get_by_role("button", name="Next").click()
-        time.sleep(random.uniform(2.0, 3.5))
+        await page.get_by_role("button", name="Next").click()
+        await asyncio.sleep(random.uniform(2.0, 3.5))
 
         # Step 9: Username
         print(f"[*] Entering username: {username}...")
         username_input = page.get_by_role("textbox", name="Username")
-        username_input.wait_for(timeout=15_000)
-        username_input.click()
-        time.sleep(random.uniform(0.3, 0.7))
-        username_input.fill(username)
-        time.sleep(random.uniform(1.0, 2.0))
+        await username_input.wait_for(timeout=15_000)
+        await username_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await username_input.fill(username)
+        await asyncio.sleep(random.uniform(1.0, 2.0))
 
         # Click Next
         print("[*] Clicking Next for username...")
-        page.get_by_role("button", name="Next").click()
-        time.sleep(random.uniform(2.0, 3.5))
+        await page.get_by_role("button", name="Next").click()
+        await asyncio.sleep(random.uniform(2.0, 3.5))
 
         # Step 10: Handle username availability
         # Check if username is taken and handle suggested alternatives
         try:
             # Wait a bit to see if we get redirected or if there are suggestions
-            time.sleep(random.uniform(2.0, 3.0))
+            await asyncio.sleep(random.uniform(2.0, 3.0))
 
             # Check if we're still on username page (username taken)
             current_url = page.url
@@ -310,21 +311,21 @@ def create_google_account(
 
             # Check if username field is still visible (means username was rejected)
             try:
-                username_input_check.wait_for(timeout=3_000, state="visible")
+                await username_input_check.wait_for(timeout=3_000, state="visible")
                 # Username was likely rejected, look for suggested usernames
                 print("[*] Username may be taken, looking for suggestions...")
 
                 # Try to find suggested username buttons (they appear as buttons with username-like text)
                 # Look for buttons that contain alphanumeric text (likely suggested usernames)
                 all_buttons = page.locator("button")
-                button_count = all_buttons.count()
+                button_count = await all_buttons.count()
 
                 # Try clicking on a suggested username button if available
                 found_suggestion = False
                 for i in range(min(button_count, 10)):  # Check first 10 buttons
                     try:
                         button = all_buttons.nth(i)
-                        button_text = button.inner_text()
+                        button_text = await button.inner_text()
                         # Suggested usernames are usually alphanumeric and don't say "Next" or "Skip"
                         if (
                             button_text
@@ -336,8 +337,8 @@ def create_google_account(
                             print(
                                 f"[*] Found suggested username: {button_text}, clicking..."
                             )
-                            button.click()
-                            time.sleep(random.uniform(1.0, 2.0))
+                            await button.click()
+                            await asyncio.sleep(random.uniform(1.0, 2.0))
                             # Update username to the selected one
                             username = button_text
                             found_suggestion = True
@@ -351,16 +352,16 @@ def create_google_account(
                         f"[!] Username {username} is not available. Generating new username..."
                     )
                     username = generate_username(first_name, last_name)
-                    username_input_check.click()
-                    time.sleep(random.uniform(0.3, 0.7))
-                    username_input_check.fill(username)
-                    time.sleep(random.uniform(1.0, 2.0))
-                    page.get_by_role("button", name="Next").click()
-                    time.sleep(random.uniform(2.0, 3.5))
+                    await username_input_check.click()
+                    await asyncio.sleep(random.uniform(0.3, 0.7))
+                    await username_input_check.fill(username)
+                    await asyncio.sleep(random.uniform(1.0, 2.0))
+                    await page.get_by_role("button", name="Next").click()
+                    await asyncio.sleep(random.uniform(2.0, 3.5))
                 else:
                     # Click Next after selecting suggested username
-                    page.get_by_role("button", name="Next").click()
-                    time.sleep(random.uniform(2.0, 3.5))
+                    await page.get_by_role("button", name="Next").click()
+                    await asyncio.sleep(random.uniform(2.0, 3.5))
             except Exception:
                 # Username field not visible, username was accepted
                 pass
@@ -371,22 +372,22 @@ def create_google_account(
         # Step 11: Password
         print("[*] Entering password...")
         password_input = page.get_by_role("textbox", name="Password")
-        password_input.wait_for(timeout=15_000)
-        password_input.fill(password)
-        time.sleep(random.uniform(0.3, 0.7))
-        password_input.press("Tab")
-        time.sleep(random.uniform(0.5, 1.0))
+        await password_input.wait_for(timeout=15_000)
+        await password_input.fill(password)
+        await asyncio.sleep(random.uniform(0.3, 0.7))
+        await password_input.press("Tab")
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Step 12: Confirm Password
         print("[*] Confirming password...")
         confirm_password_input = page.get_by_role("textbox", name="Confirm")
-        confirm_password_input.fill(password)
-        time.sleep(random.uniform(0.5, 1.0))
+        await confirm_password_input.fill(password)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # Step 13: Click Next
         print("[*] Clicking Next for password...")
-        page.get_by_role("button", name="Next").click()
-        time.sleep(random.uniform(2.0, 3.5))
+        await page.get_by_role("button", name="Next").click()
+        await asyncio.sleep(random.uniform(2.0, 3.5))
 
         # Step 14: Phone Verification (if required)
         print("[*] Checking for phone verification requirement...")
@@ -394,16 +395,16 @@ def create_google_account(
             phone_input = page.get_by_role(
                 "textbox", name=re.compile("phone|Phone", re.IGNORECASE)
             ).or_(page.locator('input[type="tel"]'))
-            phone_input.wait_for(timeout=5_000)
+            await phone_input.wait_for(timeout=5_000)
             if phone_number:
                 print(f"[*] Entering phone number: {phone_number}")
-                phone_input.click()
-                time.sleep(random.uniform(0.3, 0.7))
-                phone_input.fill(phone_number)
-                time.sleep(random.uniform(1.0, 2.0))
+                await phone_input.click()
+                await asyncio.sleep(random.uniform(0.3, 0.7))
+                await phone_input.fill(phone_number)
+                await asyncio.sleep(random.uniform(1.0, 2.0))
 
-                page.get_by_role("button", name="Next").click()
-                time.sleep(random.uniform(2.0, 3.5))
+                await page.get_by_role("button", name="Next").click()
+                await asyncio.sleep(random.uniform(2.0, 3.5))
 
                 # Wait for verification code input
                 print(
@@ -412,23 +413,29 @@ def create_google_account(
                 code_input = page.get_by_role(
                     "textbox", name=re.compile("code|Code|verification", re.IGNORECASE)
                 ).or_(page.locator('input[type="tel"]'))
-                code_input.wait_for(timeout=60_000)
-                input(
-                    "    Enter the verification code in the browser and press Enter here to continue..."
+                await code_input.wait_for(timeout=60_000)
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    input,
+                    "    Enter the verification code in the browser and press Enter here to continue...",
                 )
-                time.sleep(random.uniform(1.0, 2.0))
+                await asyncio.sleep(random.uniform(1.0, 2.0))
 
                 # Click Verify or Next
                 try:
-                    page.get_by_role("button", name="Verify").click()
+                    await page.get_by_role("button", name="Verify").click()
                 except Exception:
-                    page.get_by_role("button", name="Next").click()
-                time.sleep(random.uniform(2.0, 3.5))
+                    await page.get_by_role("button", name="Next").click()
+                await asyncio.sleep(random.uniform(2.0, 3.5))
             else:
                 print("[!] Phone verification required but no phone number provided.")
                 print("[!] Please complete the verification manually in the browser.")
-                input(
-                    "    After completing verification, press Enter here to continue..."
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    input,
+                    "    After completing verification, press Enter here to continue...",
                 )
         except Exception:
             print("[*] Phone verification not required or skipped.")
@@ -437,13 +444,13 @@ def create_google_account(
         print("[*] Checking for recovery email...")
         try:
             recovery_email_input = page.locator('input[type="email"]')
-            recovery_email_input.wait_for(timeout=3_000)
+            await recovery_email_input.wait_for(timeout=3_000)
             print("[*] Skipping recovery email (optional)...")
             skip_button = page.locator('button:has-text("Skip")').or_(
                 page.locator('button:has-text("Next")')
             )
-            skip_button.first.click()
-            time.sleep(random.uniform(2.0, 3.0))
+            await skip_button.first.click()
+            await asyncio.sleep(random.uniform(2.0, 3.0))
         except Exception:
             pass  # Recovery email step not present
 
@@ -451,32 +458,37 @@ def create_google_account(
         print("[*] Accepting terms and conditions...")
         try:
             # Scroll to find the terms checkbox
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(random.uniform(1.0, 2.0))
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(random.uniform(1.0, 2.0))
 
             # Look for terms acceptance
             terms_checkbox = page.locator('input[type="checkbox"]').or_(
                 page.locator('div[role="checkbox"]')
             )
-            terms_checkbox.first.wait_for(timeout=5_000)
-            terms_checkbox.first.click()
-            time.sleep(random.uniform(0.5, 1.0))
+            await terms_checkbox.first.wait_for(timeout=5_000)
+            await terms_checkbox.first.click()
+            await asyncio.sleep(random.uniform(0.5, 1.0))
 
             # Click Create Account or I Agree
             create_button = page.locator('button:has-text("Create account")').or_(
                 page.locator('button:has-text("I agree")')
             )
-            create_button.first.click()
-            time.sleep(random.uniform(3.0, 5.0))
+            await create_button.first.click()
+            await asyncio.sleep(random.uniform(3.0, 5.0))
         except Exception as e:
             print(f"[!] Could not find terms checkbox automatically: {e}")
             print("[!] Please accept terms manually in the browser.")
-            input("    After accepting terms, press Enter here to continue...")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                input,
+                "    After accepting terms, press Enter here to continue...",
+            )
 
         # Wait for account creation to complete
         print("[*] Waiting for account creation to complete...")
-        page.wait_for_load_state("networkidle", timeout=60_000)
-        time.sleep(random.uniform(2.0, 3.0))
+        await page.wait_for_load_state("networkidle", timeout=60_000)
+        await asyncio.sleep(random.uniform(2.0, 3.0))
 
         # Check if we're on a success page or logged in
         current_url = page.url
@@ -519,7 +531,7 @@ def create_google_account(
         return None
 
 
-def run_account_creation(
+async def run_account_creation(
     first_name: Optional[str] = None,
     last_name: Optional[str] = None,
     username: Optional[str] = None,
@@ -539,19 +551,25 @@ def run_account_creation(
     creation_profile_name = f"{profile_name}_creation"
     print(f"[*] Using browser profile: {creation_profile_name}")
 
-    print("[*] Initializing browser...")
-    page, context, playwright = initialize_page(headless=headless, user_profile_name=creation_profile_name)
+    page = None
+    context = None
+    playwright = None
 
     try:
+        print("[*] Initializing browser...")
+        page, context, playwright = await initialize_page(
+            headless=headless, user_profile_name=creation_profile_name
+        )
+
         # Navigate to a neutral page first
         print("[*] Establishing browser session...")
-        page.goto(
+        await page.goto(
             "https://www.google.com", wait_until="domcontentloaded", timeout=10000
         )
-        time.sleep(random.uniform(1.0, 2.0))
+        await asyncio.sleep(random.uniform(1.0, 2.0))
 
         # Create the account
-        account_data = create_google_account(
+        account_data = await create_google_account(
             page,
             first_name=first_name,
             last_name=last_name,
@@ -585,20 +603,40 @@ def run_account_creation(
         if not headless:
             print("[*] Browser will remain open. Press Ctrl+C to close.")
             try:
-                input("\n[*] Press Enter to close the browser...")
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None, input, "\n[*] Press Enter to close the browser..."
+                )
             except KeyboardInterrupt:
                 pass
 
     except KeyboardInterrupt:
         print("\n[*] Interrupted by user. Closing browser...")
     except Exception as exc:
-        print(f"\n[-] Error: {exc}")
-        import traceback
-        traceback.print_exc()
+        error_msg = str(exc)
+        if "Target page, context or browser has been closed" in error_msg:
+            print("\n[!] Error: Browser profile is locked or in use by another process.")
+            print("[!] Solution: Stop other processes using the profile, or use a different profile name.")
+        elif "profile appears to be in use" in error_msg.lower():
+            print("\n[!] Error: Browser profile is locked by another Chromium process.")
+            print("[!] Solution: Close other browser instances or stop the FastAPI app.")
+        else:
+            print(f"\n[-] Error: {exc}")
+            import traceback
+            traceback.print_exc()
     finally:
+        # Clean up resources
         print("[*] Closing browser context...")
-        context.close()
-        playwright.stop()
+        if context:
+            try:
+                await context.close()
+            except Exception as exc:
+                print(f"[!] Warning: Error closing context: {exc}")
+        if playwright:
+            try:
+                await playwright.stop()
+            except Exception as exc:
+                print(f"[!] Warning: Error stopping playwright: {exc}")
         print("[+] Browser closed.")
 
 
@@ -680,18 +718,20 @@ def main() -> None:
     # Load environment variables
     load_dotenv()
 
-    run_account_creation(
-        first_name=args.first_name,
-        last_name=args.last_name,
-        username=args.username,
-        password=args.password,
-        phone_number=args.phone_number,
-        birthday_day=args.birthday_day,
-        birthday_month=args.birthday_month,
-        birthday_year=args.birthday_year,
-        gender=args.gender,
-        headless=args.headless,
-        profile_name=args.profile_name,
+    asyncio.run(
+        run_account_creation(
+            first_name=args.first_name,
+            last_name=args.last_name,
+            username=args.username,
+            password=args.password,
+            phone_number=args.phone_number,
+            birthday_day=args.birthday_day,
+            birthday_month=args.birthday_month,
+            birthday_year=args.birthday_year,
+            gender=args.gender,
+            headless=args.headless,
+            profile_name=args.profile_name,
+        )
     )
 
 
@@ -705,4 +745,4 @@ if __name__ == "__main__":
     else:
         # Run with default parameters (all random)
         print("[*] No arguments provided. Creating account with random values...")
-        run_account_creation(headless=False)
+        asyncio.run(run_account_creation(headless=False))
