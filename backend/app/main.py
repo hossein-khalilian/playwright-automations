@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 
+from app.automation.tasks.google_login import login_to_google
 from app.routes.google import router as google_router
 from app.utils.browser_state import clear_browser_resources, set_browser_resources
 from app.utils.browser_utils import initialize_page
+from app.utils.google import check_google_login_status, load_credentials_from_env
 
 # from app.routes.notebooklm import router as notebooklm_router
 
@@ -33,6 +35,25 @@ async def lifespan(app: FastAPI):
         )
         set_browser_resources(page, context, playwright)
         print("[+] Browser initialized successfully!")
+
+        # Check or login to Google
+        print("[*] Checking Google login status...")
+        try:
+            if await check_google_login_status(page):
+                print("[+] Google is already logged in.")
+            else:
+                print("[*] Not logged in to Google. Attempting to login...")
+                email, password = load_credentials_from_env()
+                success = await login_to_google(page, email, password)
+                if success:
+                    print("[+] Google login completed successfully!")
+                else:
+                    print(
+                        "[!] Warning: Google login failed. Some endpoints may not work correctly."
+                    )
+        except Exception as exc:
+            print(f"[!] Warning: Error during Google login check: {exc}")
+            print("[!] Some Google-dependent endpoints may not work correctly.")
     except Exception as exc:
         print(f"[!] Warning: Failed to initialize browser: {exc}")
         print("[!] Browser-dependent endpoints may not work correctly.")

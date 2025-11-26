@@ -107,7 +107,9 @@ async def login_to_google(
         return False
 
 
-async def main():
+async def check_or_login_to_google(
+    user_profile_name: str = "test_google_login", headless: bool = False
+):
     print("[*] Initializing browser...")
     page = None
     context = None
@@ -115,24 +117,17 @@ async def main():
 
     try:
         # Use a test profile to avoid conflicts with running FastAPI app
-        test_profile = "test_google_login"
-        print(f"[*] Using profile: {test_profile}")
+        print(f"[*] Using profile: {user_profile_name}")
         page, context, playwright = await initialize_page(
-            headless=False, user_profile_name=test_profile
+            headless=headless, user_profile_name=user_profile_name
         )
 
         # Check if already logged in
         print("[*] Checking if Google is already logged in...")
         if await check_google_login_status(page):
             print("[+] Google is already logged in. No need to login again.")
-            print("[*] Browser will remain open. Press Ctrl+C to close.")
-            try:
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None, input, "\n[*] Press Enter to close the browser..."
-                )
-            except KeyboardInterrupt:
-                pass
+            print("[*] Browser will remain open for 5 seconds. Press Ctrl+C to close.")
+            await asyncio.sleep(5)
         else:
             print("[*] Not logged in. Starting login process...")
             # Load credentials from environment
@@ -146,14 +141,8 @@ async def main():
             else:
                 print("[-] Login process failed.")
 
-            print("[*] Browser will remain open. Press Ctrl+C to close.")
-            try:
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None, input, "\n[*] Press Enter to close the browser..."
-                )
-            except KeyboardInterrupt:
-                pass
+            print("[*] Browser will remain open for 5 seconds. Press Ctrl+C to close.")
+            await asyncio.sleep(5)
     except KeyboardInterrupt:
         print("\n[*] Interrupted by user. Closing browser...")
     except Exception as exc:
@@ -188,4 +177,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(check_or_login_to_google())
