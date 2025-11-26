@@ -4,15 +4,14 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from app.automation.tasks.google_login import login_to_google
-from app.routes.google import router as google_router
+from app.routes.google_api import router as google_router
+from app.routes.notebooklm_api import router as notebooklm_router
 from app.utils.browser_state import clear_browser_resources, set_browser_resources
 from app.utils.browser_utils import initialize_page
 from app.utils.google import check_google_login_status, load_credentials_from_env
 
-# from app.routes.notebooklm import router as notebooklm_router
-
 api_router = APIRouter()
-# api_router.include_router(notebooklm_router)
+api_router.include_router(notebooklm_router)
 api_router.include_router(google_router)
 
 
