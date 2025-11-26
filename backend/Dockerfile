@@ -6,6 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=on \
     PATH="/opt/venv/bin:$PATH"
 
+# Install basic tools needed for playwright install-deps
+RUN apt-get update && apt-get install -y \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create virtual env
 RUN python -m venv /opt/venv
 
@@ -15,6 +20,10 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install -r requirements.txt
+
+# Install Playwright system dependencies and browsers
+RUN playwright install-deps chromium && \
+    playwright install chromium
 
 COPY . .
 
