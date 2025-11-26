@@ -1,6 +1,7 @@
-fastapi==0.122.0
-playwright==1.56.0
-pydantic==2.12.4
-pymongo==4.15.4
-python-dotenv==1.2.1
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+playwright>=1.40.0
+python-dotenv>=1.0.0
+pymongo>=4.6.0
+pydantic>=2.0.0
 
