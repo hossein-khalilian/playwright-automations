@@ -1,9 +1,6 @@
 import asyncio
 import random
 import re
-import sys
-import time
-from pathlib import Path
 
 from playwright.async_api import Page
 
