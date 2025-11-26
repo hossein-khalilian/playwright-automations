@@ -2,19 +2,21 @@
 Reusable helpers for Google login automations.
 """
 
+import asyncio
 import os
 import shutil
 from pathlib import Path
 from typing import Tuple
 
+from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
+
 from app.utils.google import check_google_login_status
 from app.utils.system_resolution import get_system_resolution
-from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def initialize_page(
+async def initialize_page(
     headless: bool = False, user_profile_name="default"
 ) -> Tuple[Page, BrowserContext, Playwright]:
     """
@@ -22,6 +24,7 @@ def initialize_page(
 
     Args:
         headless: Whether to run the browser in headless mode (default: False)
+        user_profile_name: Name of the user profile directory (default: "default")
 
     Returns:
         Tuple of (page, context, playwright). The caller is responsible for closing
@@ -31,7 +34,7 @@ def initialize_page(
     CONTEXT_PATH = BASE_DIR / "automation" / "browser_profiles" / user_profile_name
     CONTEXT_PATH.mkdir(parents=True, exist_ok=True)
 
-    playwright = sync_playwright().start()
+    playwright = await async_playwright().start()
 
     # Use a realistic Chrome user agent
     user_agent = (
@@ -42,7 +45,7 @@ def initialize_page(
     # Get system resolution for viewport
     viewport = get_system_resolution()
 
-    context = playwright.chromium.launch_persistent_context(
+    context = await playwright.chromium.launch_persistent_context(
         user_data_dir=str(CONTEXT_PATH),
         headless=headless,
         viewport=viewport,
@@ -63,10 +66,10 @@ def initialize_page(
         },
     )
 
-    page = context.pages[0] if context.pages else context.new_page()
+    page = context.pages[0] if context.pages else await context.new_page()
 
     # Apply comprehensive stealth mode using CDP
-    setup_stealth_mode(context, page)
+    await setup_stealth_mode(context, page)
 
     return page, context, playwright
 
@@ -82,7 +85,7 @@ def clear_user_profile(user_profile_name: str = "default") -> None:
         print("[*] No user profile found.")
 
 
-def setup_stealth_mode(context: BrowserContext, page: Page) -> None:
+async def setup_stealth_mode(context: BrowserContext, page: Page) -> None:
     """
     Inject comprehensive stealth scripts using CDP to make the browser appear as a real user browser.
     This helps bypass Google's automation detection.
@@ -170,33 +173,72 @@ def setup_stealth_mode(context: BrowserContext, page: Page) -> None:
 
     # Inject via CDP which runs before page scripts - this is critical
     try:
-        cdp_session = context.new_cdp_session(page)
-        cdp_session.send(
+        cdp_session = await context.new_cdp_session(page)
+        await cdp_session.send(
             "Page.addScriptToEvaluateOnNewDocument", {"source": stealth_script}
         )
     except Exception as exc:  # pragma: no cover - best effort
         print(f"[!] Warning: Could not set up CDP stealth: {exc}")
 
     # Also add via context init script for additional coverage
-    context.add_init_script(stealth_script)
+    await context.add_init_script(stealth_script)
+
+
+async def main():
+    print("[*] Initializing browser with persistent user data and stealth mode...")
+    page = None
+    context = None
+    playwright = None
+    
+    try:
+        # Use a test profile to avoid conflicts with running FastAPI app
+        test_profile = "test_standalone"
+        print(f"[*] Using test profile: {test_profile}")
+        page, context, playwright = await initialize_page(
+            headless=False, user_profile_name=test_profile
+        )
+        print("[+] Browser initialized successfully!")
+        print("[*] Browser is now open. Press Ctrl+C to close.")
+
+        # Navigate to a test page to verify it works
+        await page.goto("https://www.google.com")
+        print(f"[*] Navigated to: {page.url}")
+        result = await check_google_login_status(page)
+        print(f"[*] Google login status: {result}")
+        # Keep the browser open - use asyncio to run input in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, input, "\n[*] Press Enter to close the browser..."
+        )
+    except KeyboardInterrupt:
+        print("\n[*] Closing browser...")
+    except Exception as exc:
+        error_msg = str(exc)
+        if "Target page, context or browser has been closed" in error_msg:
+            print("\n[!] Error: Browser profile is locked or in use by another process.")
+            print("[!] This usually happens when:")
+            print("    - The FastAPI app is running and using the same profile")
+            print("    - Another browser instance is using the profile")
+            print("[!] Solution: Stop other processes using the profile, or use a different profile name.")
+        elif "profile appears to be in use" in error_msg.lower():
+            print("\n[!] Error: Browser profile is locked by another Chromium process.")
+            print("[!] Solution: Close other browser instances or stop the FastAPI app.")
+        else:
+            print(f"\n[!] Error: {exc}")
+    finally:
+        # Clean up resources
+        if context:
+            try:
+                await context.close()
+            except Exception as exc:
+                print(f"[!] Warning: Error closing context: {exc}")
+        if playwright:
+            try:
+                await playwright.stop()
+            except Exception as exc:
+                print(f"[!] Warning: Error stopping playwright: {exc}")
+        print("[+] Browser closed.")
 
 
 if __name__ == "__main__":
-    print("[*] Initializing browser with persistent user data and stealth mode...")
-    page, context, playwright = initialize_page(headless=False)
-    print("[+] Browser initialized successfully!")
-    print("[*] Browser is now open. Press Ctrl+C to close.")
-
-    try:
-        # Navigate to a test page to verify it works
-        page.goto("https://www.google.com")
-        print(f"[*] Navigated to: {page.url}")
-        print(check_google_login_status(page))
-        # Keep the browser open
-        input("\n[*] Press Enter to close the browser...")
-    except KeyboardInterrupt:
-        print("\n[*] Closing browser...")
-    finally:
-        context.close()
-        playwright.stop()
-        print("[+] Browser closed.")
+    asyncio.run(main())

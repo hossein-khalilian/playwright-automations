@@ -1,13 +1,11 @@
+import asyncio
 import random
 import re
 import sys
 import time
 from pathlib import Path
 
-from playwright.sync_api import Page
-
-# Add parent directory to path to import from app.utils
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from playwright.async_api import Page
 
 from app.utils.browser_utils import initialize_page
 from app.utils.google import check_google_login_status, load_credentials_from_env
@@ -16,27 +14,27 @@ NAVIGATION_DELAY_RANGE = (2.0, 3.0)
 PAGE_WARMUP_DELAY_RANGE = (1.0, 2.0)
 
 
-def _human_pause(min_seconds: float = 0.5, max_seconds: float = 1.0) -> None:
+async def _human_pause(min_seconds: float = 0.5, max_seconds: float = 1.0) -> None:
     """Pause for a random duration to better mimic human interaction."""
-    time.sleep(random.uniform(min_seconds, max_seconds))
+    await asyncio.sleep(random.uniform(min_seconds, max_seconds))
 
 
-def _type_with_human_delay(field, value: str) -> None:
+async def _type_with_human_delay(field, value: str) -> None:
     """Type text into a field using small randomized delays."""
-    field.click()
-    _human_pause()
-    field.type(value, delay=random.randint(50, 150))
-    _human_pause()
+    await field.click()
+    await _human_pause()
+    await field.type(value, delay=random.randint(50, 150))
+    await _human_pause()
 
 
-def _click_next_button(page: Page) -> None:
+async def _click_next_button(page: Page) -> None:
     """Click the generic Next button and wait for Google to progress."""
     next_button = page.get_by_role("button", name=re.compile("^next$", re.IGNORECASE))
-    next_button.click()
-    _human_pause(*NAVIGATION_DELAY_RANGE)
+    await next_button.click()
+    await _human_pause(*NAVIGATION_DELAY_RANGE)
 
 
-def login_to_google(
+async def login_to_google(
     page: Page,
     email: str,
     password: str,
@@ -52,7 +50,7 @@ def login_to_google(
     """
     try:
         print("\n[*] Opening Gmail login page...")
-        page.goto(
+        await page.goto(
             "https://accounts.google.com/signin/v2/identifier?service=mail&passive=true",
             wait_until="domcontentloaded",
             timeout=60_000,
@@ -63,30 +61,30 @@ def login_to_google(
         email_input = page.get_by_role(
             "textbox", name=re.compile("email|phone", re.IGNORECASE)
         )
-        email_input.wait_for(timeout=15_000)
+        await email_input.wait_for(timeout=15_000)
 
         # Human-like typing with random delays
-        _type_with_human_delay(email_input, email)
-        _click_next_button(page)
+        await _type_with_human_delay(email_input, email)
+        await _click_next_button(page)
 
         # Wait for password field to appear
         print("[*] Waiting for password field...")
         password_input = page.get_by_role(
             "textbox", name=re.compile("password", re.IGNORECASE)
         )
-        password_input.wait_for(timeout=20_000)
-        time.sleep(random.uniform(0.5, 1.0))
+        await password_input.wait_for(timeout=20_000)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
         # ---- Password step ----
         print("[*] Entering password...")
-        _type_with_human_delay(password_input, password)
-        _click_next_button(page)
+        await _type_with_human_delay(password_input, password)
+        await _click_next_button(page)
 
         # Let Google redirect after password
         print("[*] Waiting for Gmail to load after password submission...")
-        page.wait_for_load_state("networkidle", timeout=60_000)
+        await page.wait_for_load_state("networkidle", timeout=60_000)
 
-        if check_google_login_status(page):
+        if await check_google_login_status(page):
             print("\n[+] Successfully logged into Gmail!")
             return True
 
@@ -95,9 +93,12 @@ def login_to_google(
             "\n[!] Google is asking for additional verification (2FA, phone, etc.). "
             "Complete the steps manually in the opened browser."
         )
-        input("    When you see your inbox, press Enter here to continue...")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, input, "    When you see your inbox, press Enter here to continue..."
+        )
 
-        if check_google_login_status(page):
+        if await check_google_login_status(page):
             print("\n[+] Gmail login completed manually and session is now active.")
             return True
 
@@ -109,43 +110,85 @@ def login_to_google(
         return False
 
 
-if __name__ == "__main__":
+async def main():
     print("[*] Initializing browser...")
-    page, context, playwright = initialize_page(headless=False)
-    
+    page = None
+    context = None
+    playwright = None
+
     try:
+        # Use a test profile to avoid conflicts with running FastAPI app
+        test_profile = "test_google_login"
+        print(f"[*] Using profile: {test_profile}")
+        page, context, playwright = await initialize_page(
+            headless=False, user_profile_name=test_profile
+        )
+
         # Check if already logged in
         print("[*] Checking if Google is already logged in...")
-        if check_google_login_status(page):
+        if await check_google_login_status(page):
             print("[+] Google is already logged in. No need to login again.")
             print("[*] Browser will remain open. Press Ctrl+C to close.")
             try:
-                input("\n[*] Press Enter to close the browser...")
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None, input, "\n[*] Press Enter to close the browser..."
+                )
             except KeyboardInterrupt:
                 pass
         else:
             print("[*] Not logged in. Starting login process...")
             # Load credentials from environment
             email, password = load_credentials_from_env()
-            
+
             # Perform login
-            success = login_to_google(page, email, password)
-            
+            success = await login_to_google(page, email, password)
+
             if success:
                 print("[+] Login process completed successfully!")
             else:
                 print("[-] Login process failed.")
-            
+
             print("[*] Browser will remain open. Press Ctrl+C to close.")
             try:
-                input("\n[*] Press Enter to close the browser...")
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None, input, "\n[*] Press Enter to close the browser..."
+                )
             except KeyboardInterrupt:
                 pass
     except KeyboardInterrupt:
         print("\n[*] Interrupted by user. Closing browser...")
     except Exception as exc:
-        print(f"\n[-] Error: {exc}")
+        error_msg = str(exc)
+        if "Target page, context or browser has been closed" in error_msg:
+            print(
+                "\n[!] Error: Browser profile is locked or in use by another process."
+            )
+            print(
+                "[!] Solution: Stop other processes using the profile, or use a different profile name."
+            )
+        elif "profile appears to be in use" in error_msg.lower():
+            print("\n[!] Error: Browser profile is locked by another Chromium process.")
+            print(
+                "[!] Solution: Close other browser instances or stop the FastAPI app."
+            )
+        else:
+            print(f"\n[-] Error: {exc}")
     finally:
-        context.close()
-        playwright.stop()
+        # Clean up resources
+        if context:
+            try:
+                await context.close()
+            except Exception as exc:
+                print(f"[!] Warning: Error closing context: {exc}")
+        if playwright:
+            try:
+                await playwright.stop()
+            except Exception as exc:
+                print(f"[!] Warning: Error stopping playwright: {exc}")
         print("[+] Browser closed.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
