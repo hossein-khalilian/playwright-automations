@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 from typing import Tuple
 
+from app.utils.google import check_google_login_status
 from app.utils.system_resolution import get_system_resolution
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
@@ -190,6 +191,7 @@ if __name__ == "__main__":
         # Navigate to a test page to verify it works
         page.goto("https://www.google.com")
         print(f"[*] Navigated to: {page.url}")
+        print(check_google_login_status(page))
         # Keep the browser open
         input("\n[*] Press Enter to close the browser...")
     except KeyboardInterrupt:
