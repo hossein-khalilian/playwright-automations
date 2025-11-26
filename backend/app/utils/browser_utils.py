@@ -189,10 +189,10 @@ async def main():
     page = None
     context = None
     playwright = None
-    
+
     try:
         # Use a test profile to avoid conflicts with running FastAPI app
-        test_profile = "test_standalone"
+        test_profile = "test_google_login"
         print(f"[*] Using test profile: {test_profile}")
         page, context, playwright = await initialize_page(
             headless=False, user_profile_name=test_profile
@@ -215,14 +215,20 @@ async def main():
     except Exception as exc:
         error_msg = str(exc)
         if "Target page, context or browser has been closed" in error_msg:
-            print("\n[!] Error: Browser profile is locked or in use by another process.")
+            print(
+                "\n[!] Error: Browser profile is locked or in use by another process."
+            )
             print("[!] This usually happens when:")
             print("    - The FastAPI app is running and using the same profile")
             print("    - Another browser instance is using the profile")
-            print("[!] Solution: Stop other processes using the profile, or use a different profile name.")
+            print(
+                "[!] Solution: Stop other processes using the profile, or use a different profile name."
+            )
         elif "profile appears to be in use" in error_msg.lower():
             print("\n[!] Error: Browser profile is locked by another Chromium process.")
-            print("[!] Solution: Close other browser instances or stop the FastAPI app.")
+            print(
+                "[!] Solution: Close other browser instances or stop the FastAPI app."
+            )
         else:
             print(f"\n[!] Error: {exc}")
     finally:

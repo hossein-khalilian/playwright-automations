@@ -2,29 +2,10 @@
 Helpers related to Google authentication flows.
 """
 
-import os
 import re
-from pathlib import Path
-from typing import Final, Tuple
+from typing import Final
 
-from dotenv import load_dotenv
 from playwright.async_api import Page
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-def load_credentials_from_env() -> Tuple[str, str]:
-    """Load Gmail credentials from environment variables / .env file."""
-    load_dotenv()
-    email = os.getenv("GMAIL_EMAIL")
-    password = os.getenv("GMAIL_PASSWORD")
-
-    if not email or not password:
-        raise RuntimeError(
-            "GMAIL_EMAIL and GMAIL_PASSWORD must be set in your environment or .env file."
-        )
-
-    return email, password
 
 
 async def check_google_login_status(page: Page) -> bool:

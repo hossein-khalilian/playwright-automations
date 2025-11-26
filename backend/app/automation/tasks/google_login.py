@@ -1,14 +1,19 @@
 import asyncio
+import os
 import random
 import re
+from pathlib import Path
+from typing import Final, Tuple
 
 from playwright.async_api import Page
 
 from app.utils.browser_utils import initialize_page
-from app.utils.google import check_google_login_status, load_credentials_from_env
+from app.utils.google import check_google_login_status
 
 NAVIGATION_DELAY_RANGE = (2.0, 3.0)
 PAGE_WARMUP_DELAY_RANGE = (1.0, 2.0)
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 async def _human_pause(min_seconds: float = 0.5, max_seconds: float = 1.0) -> None:
@@ -29,6 +34,38 @@ async def _click_next_button(page: Page) -> None:
     next_button = page.get_by_role("button", name=re.compile("^next$", re.IGNORECASE))
     await next_button.click()
     await _human_pause(*NAVIGATION_DELAY_RANGE)
+
+
+def load_credentials_from_env() -> Tuple[str, str]:
+    """Load Gmail credentials from environment variables / .env file."""
+    load_dotenv()
+    email = os.getenv("GMAIL_EMAIL")
+    password = os.getenv("GMAIL_PASSWORD")
+
+    if not email or not password:
+        raise RuntimeError(
+            "GMAIL_EMAIL and GMAIL_PASSWORD must be set in your environment or .env file."
+        )
+
+    return email, password
+
+
+async def check_or_login_google(page: Page):
+    try:
+        if await check_google_login_status(page):
+            print("[+] Google is already logged in.")
+        else:
+            print("[*] Not logged in to Google. Attempting to login...")
+            email, password = load_credentials_from_env()
+            success = await login_to_google(page, email, password)
+            if success:
+                print("[+] Google login completed successfully!")
+            else:
+                print(
+                    "[!] Warning: Google login failed. Some endpoints may not work correctly."
+                )
+    except Exception as exc:
+        raise RuntimeError(f"Login failed: {exc}")
 
 
 async def login_to_google(
@@ -107,9 +144,7 @@ async def login_to_google(
         return False
 
 
-async def check_or_login_to_google(
-    user_profile_name: str = "test_google_login", headless: bool = False
-):
+async def main(user_profile_name: str = "test_google_login", headless: bool = False):
     print("[*] Initializing browser...")
     page = None
     context = None
@@ -177,4 +212,4 @@ async def check_or_login_to_google(
 
 
 if __name__ == "__main__":
-    asyncio.run(check_or_login_to_google())
+    asyncio.run(main())
