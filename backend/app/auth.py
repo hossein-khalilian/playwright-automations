@@ -3,20 +3,19 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 import bcrypt
+from app.models import TokenData, User
+from app.utils.config import config
+from app.utils.db import get_user_by_username
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-
-from app.models import Token, TokenData, User
-from app.utils.config import config
-from app.utils.db import get_user_by_username
 
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
 
 JWT_SECRET_KEY = config.get("jwt_secret_key")
-JWT_ALGORITHM = config.get("hs256")
+JWT_ALGORITHM = config.get("jwt_algorithm")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = config.get("jwt_access_token_expire_minutes")
 
 

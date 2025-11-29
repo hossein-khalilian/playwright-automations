@@ -1,9 +1,8 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
-
 from app.automation.tasks.google_login import check_or_login_google
+from app.routes.auth_api import router as auth_router
 from app.routes.google_api import router as google_router
 from app.routes.notebooklm_api import router as notebooklm_router
 from app.utils.browser_state import (
@@ -14,8 +13,11 @@ from app.utils.browser_state import (
     set_browser_resources,
 )
 from app.utils.browser_utils import initialize_page
+from app.utils.db import close_db_client
+from fastapi import APIRouter, FastAPI
 
 api_router = APIRouter()
+api_router.include_router(auth_router)
 api_router.include_router(notebooklm_router)
 api_router.include_router(google_router)
 
@@ -53,7 +55,17 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown: Clean up browser resources
+    # Shutdown: Clean up resources
+    print("[*] Shutting down...")
+
+    # Close database connection
+    try:
+        await close_db_client()
+        print("[+] Database connection closed successfully.")
+    except Exception as exc:
+        print(f"[!] Warning: Error closing database connection: {exc}")
+
+    # Close browser resources
     print("[*] Shutting down browser...")
     try:
         context = get_browser_context()

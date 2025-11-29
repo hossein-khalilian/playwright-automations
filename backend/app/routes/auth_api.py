@@ -1,17 +1,15 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException, status
-
 from app.auth import (
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
     CurrentUser,
-    Token,
     create_access_token,
     hash_password,
     verify_credentials,
 )
-from app.models import LoginRequest, RegisterRequest, RegisterResponse
+from app.models import LoginRequest, RegisterRequest, RegisterResponse, Token
 from app.utils.db import create_user, user_exists
+from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 

@@ -10,8 +10,8 @@ config = {
     "MONGO_DB_NAME": os.environ.get("MONGO_DB_NAME"),
     # JWT
     "JWT_SECRET_KEY": os.environ.get("JWT_SECRET_KEY"),
-    "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": os.environ.get(
-        "JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
+    "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": int(
+        os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
     ),
     "JWT_ALGORITHM": os.environ.get("JWT_ALGORITHM"),
 }
