@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, HTTPException, status
 from playwright.async_api import Page
 
+from app.auth import CurrentUser
 from app.models import GoogleLoginStatusResponse
 from app.utils.browser_state import get_browser_page
 from app.utils.google import check_google_login_status
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/google", tags=["Google"])
     response_model=GoogleLoginStatusResponse,
     status_code=status.HTTP_200_OK,
 )
-async def check_login_status() -> GoogleLoginStatusResponse:
+async def check_login_status(current_user: CurrentUser) -> GoogleLoginStatusResponse:
     """
     Check if Google is currently logged in by examining the persistent browser profile.
     Uses the browser page initialized at app startup.
