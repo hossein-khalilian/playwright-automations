@@ -8,11 +8,12 @@ import shutil
 from pathlib import Path
 from typing import Tuple
 
-from app.utils.google import check_google_login_status
-from app.utils.system_resolution import get_system_resolution
 from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+from app.utils.google import check_google_login_status
+from app.utils.system_resolution import get_system_resolution
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 async def initialize_page(
