@@ -26,3 +26,18 @@ class TokenData(BaseModel):
 
 class User(BaseModel):
     username: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class RegisterResponse(BaseModel):
+    message: str
+    username: str

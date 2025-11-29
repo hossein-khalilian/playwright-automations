@@ -3,13 +3,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 import bcrypt
-from app.models import Token, TokenData, User
-from app.utils.config import config
-from app.utils.db import get_user_by_username
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
+
+from app.models import Token, TokenData, User
+from app.utils.config import config
+from app.utils.db import get_user_by_username
 
 # ---------------------------------------------------------------------------
 # Settings
@@ -39,12 +39,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     )
 
 
-def verify_credentials(username: str, password: str) -> Optional[User]:
+async def verify_credentials(username: str, password: str) -> Optional[User]:
     """
     Verify username/password against database.
     Returns User if valid, None otherwise.
     """
-    user_doc = get_user_by_username(username)
+    user_doc = await get_user_by_username(username)
     if not user_doc:
         return None
 
@@ -91,7 +91,7 @@ async def get_current_user(
         raise credentials_exception
 
     # Verify user exists in database and is active
-    user_doc = get_user_by_username(token_data.username)
+    user_doc = await get_user_by_username(token_data.username)
     if not user_doc or not user_doc.get("is_active", True):
         raise credentials_exception
 
