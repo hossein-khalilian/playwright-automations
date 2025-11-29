@@ -52,3 +52,18 @@ class Notebook(BaseModel):
 
 class NotebookListResponse(BaseModel):
     notebooks: List[Notebook] = Field(description="List of notebooks for the current user")
+
+
+class SourceUploadResponse(BaseModel):
+    status: str = Field(description="Status of the source upload")
+    message: str = Field(description="Message describing the result")
+
+
+class Source(BaseModel):
+    name: str = Field(description="Name of the source file")
+
+
+class SourceListResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    sources: List[Source] = Field(description="List of sources in the notebook")
