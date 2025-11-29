@@ -67,3 +67,57 @@ class SourceListResponse(BaseModel):
     status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")
     sources: List[Source] = Field(description="List of sources in the notebook")
+
+
+class NotebookQueryRequest(BaseModel):
+    query: str = Field(description="The query text to send to the notebook")
+
+
+class NotebookQueryResponse(BaseModel):
+    status: str = Field(description="Status of the query operation")
+    message: str = Field(description="Message describing the result")
+    query: str = Field(description="The query that was sent")
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(description="Role of the message sender: 'user' or 'assistant'")
+    content: str = Field(description="The message content in markdown format")
+
+
+class ChatHistoryResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    messages: List[ChatMessage] = Field(description="List of chat messages in chronological order")
+
+
+class AudioOverviewCreateResponse(BaseModel):
+    status: str = Field(description="Status of the audio overview creation")
+    message: str = Field(description="Message describing the result")
+
+
+class AudioOverviewStatusResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    is_generating: bool = Field(description="Whether the audio overview is currently being generated")
+    audio_name: Optional[str] = Field(None, description="Name of the audio overview if it exists")
+
+
+class AudioOverviewRenameRequest(BaseModel):
+    new_name: str = Field(description="The new name for the audio overview")
+
+
+class AudioOverviewRenameResponse(BaseModel):
+    status: str = Field(description="Status of the rename operation")
+    message: str = Field(description="Message describing the result")
+
+
+class AudioOverviewDownloadResponse(BaseModel):
+    status: str = Field(description="Status of the download operation")
+    message: str = Field(description="Message describing the result")
+    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
+    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
+
+
+class AudioOverviewDeleteResponse(BaseModel):
+    status: str = Field(description="Status of the deletion operation")
+    message: str = Field(description="Message describing the result")

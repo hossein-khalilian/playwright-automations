@@ -6,11 +6,21 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from playwright.async_api import Page
 
 from app.auth import CurrentUser
-from app.automation.tasks.notebooklm.create_notebook import NotebookLMError
+from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.models import (
+    AudioOverviewCreateResponse,
+    AudioOverviewDeleteResponse,
+    AudioOverviewDownloadResponse,
+    AudioOverviewRenameRequest,
+    AudioOverviewRenameResponse,
+    AudioOverviewStatusResponse,
+    ChatHistoryResponse,
+    ChatMessage,
     Notebook,
     NotebookCreateResponse,
     NotebookListResponse,
+    NotebookQueryRequest,
+    NotebookQueryResponse,
     Source,
     SourceListResponse,
     SourceUploadResponse,
@@ -18,8 +28,16 @@ from app.models import (
 from app.utils.browser_state import get_browser_page
 from app.utils.db import delete_notebook_from_db, get_notebooks_by_user, save_notebook
 from app.utils.notebooklm import (
+    trigger_audio_overview_creation,
+    trigger_audio_overview_deletion,
+    trigger_audio_overview_download,
+    trigger_audio_overview_rename,
+    trigger_audio_overview_status,
+    trigger_chat_history,
+    trigger_chat_history_deletion,
     trigger_notebook_creation,
     trigger_notebook_deletion,
+    trigger_notebook_query,
     trigger_source_deletion,
     trigger_source_listing,
     trigger_source_upload,
@@ -91,7 +109,7 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
     List all notebooks for the current user.
     """
     notebooks_data = await get_notebooks_by_user(current_user.username)
-    
+
     notebooks = [
         Notebook(
             notebook_id=notebook["notebook_id"],
@@ -100,7 +118,7 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
         )
         for notebook in notebooks_data
     ]
-    
+
     return NotebookListResponse(notebooks=notebooks)
 
 
@@ -361,3 +379,474 @@ async def delete_source_endpoint(
         "status": result["status"],
         "message": result["message"],
     }
+
+
+@router.post(
+    "/notebooks/{notebook_id}/query",
+    response_model=NotebookQueryResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def query_notebook_endpoint(
+    notebook_id: str,
+    request: NotebookQueryRequest,
+    current_user: CurrentUser,
+) -> NotebookQueryResponse:
+    """
+    Query a notebook in NotebookLM.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_notebook_query(page, notebook_id, request.query)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while querying NotebookLM notebook.",
+        ) from exc
+
+    return NotebookQueryResponse(
+        status=result["status"],
+        message=result["message"],
+        query=result["query"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/chat",
+    response_model=ChatHistoryResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_chat_history_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> ChatHistoryResponse:
+    """
+    Get the complete chat history from a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_chat_history(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while retrieving chat history from NotebookLM notebook.",
+        ) from exc
+
+    # Convert messages to ChatMessage objects
+    chat_messages = [
+        ChatMessage(role=msg["role"], content=msg["content"])
+        for msg in result.get("messages", [])
+    ]
+
+    return ChatHistoryResponse(
+        status=result["status"],
+        message=result["message"],
+        messages=chat_messages,
+    )
+
+
+@router.delete(
+    "/notebooks/{notebook_id}/chat",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_chat_history_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> dict:
+    """
+    Delete the chat history from a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_chat_history_deletion(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while deleting chat history from NotebookLM notebook.",
+        ) from exc
+
+    return {
+        "status": result["status"],
+        "message": result["message"],
+    }
+
+
+@router.post(
+    "/notebooks/{notebook_id}/audio-overview",
+    response_model=AudioOverviewCreateResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def create_audio_overview_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> AudioOverviewCreateResponse:
+    """
+    Create an audio overview for a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_audio_overview_creation(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while creating audio overview.",
+        ) from exc
+
+    return AudioOverviewCreateResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/audio-overview",
+    response_model=AudioOverviewStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_audio_overview_status_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> AudioOverviewStatusResponse:
+    """
+    Get the status of the audio overview for a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_audio_overview_status(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while getting audio overview status.",
+        ) from exc
+
+    return AudioOverviewStatusResponse(
+        status=result["status"],
+        message=result["message"],
+        is_generating=result.get("is_generating", False),
+        audio_name=result.get("audio_name"),
+    )
+
+
+@router.put(
+    "/notebooks/{notebook_id}/audio-overview/rename",
+    response_model=AudioOverviewRenameResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def rename_audio_overview_endpoint(
+    notebook_id: str,
+    request: AudioOverviewRenameRequest,
+    current_user: CurrentUser,
+) -> AudioOverviewRenameResponse:
+    """
+    Rename an audio overview.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_audio_overview_rename(
+            page, notebook_id, request.new_name
+        )
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while renaming audio overview.",
+        ) from exc
+
+    return AudioOverviewRenameResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/audio-overview/download",
+    response_model=AudioOverviewDownloadResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def download_audio_overview_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> AudioOverviewDownloadResponse:
+    """
+    Download an audio overview from a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_audio_overview_download(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while downloading audio overview.",
+        ) from exc
+
+    return AudioOverviewDownloadResponse(
+        status=result["status"],
+        message=result["message"],
+        download_path=result.get("download_path"),
+        suggested_filename=result.get("suggested_filename"),
+    )
+
+
+@router.delete(
+    "/notebooks/{notebook_id}/audio-overview",
+    response_model=AudioOverviewDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def delete_audio_overview_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> AudioOverviewDeleteResponse:
+    """
+    Delete an audio overview from a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_audio_overview_deletion(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while deleting audio overview.",
+        ) from exc
+
+    return AudioOverviewDeleteResponse(
+        status=result["status"],
+        message=result["message"],
+    )
