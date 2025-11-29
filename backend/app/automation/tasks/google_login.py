@@ -3,17 +3,15 @@ import os
 import random
 import re
 from pathlib import Path
-from typing import Final, Tuple
-
-from playwright.async_api import Page
+from typing import Tuple
 
 from app.utils.browser_utils import initialize_page
 from app.utils.google import check_google_login_status
+from dotenv import load_dotenv
+from playwright.async_api import Page
 
 NAVIGATION_DELAY_RANGE = (2.0, 3.0)
 PAGE_WARMUP_DELAY_RANGE = (1.0, 2.0)
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 async def _human_pause(min_seconds: float = 0.5, max_seconds: float = 1.0) -> None:

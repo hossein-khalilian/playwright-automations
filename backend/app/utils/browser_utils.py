@@ -8,12 +8,11 @@ import shutil
 from pathlib import Path
 from typing import Tuple
 
-from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
-
 from app.utils.google import check_google_login_status
 from app.utils.system_resolution import get_system_resolution
+from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 async def initialize_page(
@@ -31,7 +30,7 @@ async def initialize_page(
         the context and stopping the playwright instance when done.
     """
     # Create user data directory if it doesn't exist
-    CONTEXT_PATH = BASE_DIR / "automation" / "browser_profiles" / user_profile_name
+    CONTEXT_PATH = BASE_DIR / "browser_profiles" / user_profile_name
     CONTEXT_PATH.mkdir(parents=True, exist_ok=True)
 
     playwright = await async_playwright().start()
