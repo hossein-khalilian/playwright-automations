@@ -1,4 +1,5 @@
-from typing import Optional
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -41,3 +42,13 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     message: str
     username: str
+
+
+class Notebook(BaseModel):
+    notebook_id: str = Field(description="Unique identifier for the notebook")
+    notebook_url: str = Field(description="URL of the notebook page")
+    created_at: datetime = Field(description="Timestamp when the notebook was created")
+
+
+class NotebookListResponse(BaseModel):
+    notebooks: List[Notebook] = Field(description="List of notebooks for the current user")

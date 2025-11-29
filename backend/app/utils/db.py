@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from pymongo import AsyncMongoClient
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
@@ -41,6 +41,16 @@ async def get_users_collection():
     db_name = config.get("mongo_db_name", "playwright_automations")
     db = client[db_name]
     return db["users"]
+
+
+async def get_notebooks_collection():
+    """Get the notebooks collection from MongoDB."""
+    client = await get_db_client()
+    if client is None:
+        return None
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    db = client[db_name]
+    return db["notebooks"]
 
 
 async def create_user(username: str, hashed_password: str) -> bool:
@@ -87,6 +97,71 @@ async def user_exists(username: str) -> bool:
     """Check if a user exists in the database."""
     user = await get_user_by_username(username)
     return user is not None
+
+
+async def save_notebook(username: str, notebook_id: str, notebook_url: str) -> bool:
+    """
+    Save a notebook to the database for a user.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_notebooks_collection()
+    if collection is None:
+        return False
+
+    try:
+        # Create index on username and notebook_id if they don't exist
+        await collection.create_index("username")
+        await collection.create_index([("username", 1), ("notebook_id", 1)], unique=True)
+
+        notebook_doc = {
+            "username": username,
+            "notebook_id": notebook_id,
+            "notebook_url": notebook_url,
+            "created_at": datetime.now(timezone.utc),
+        }
+        await collection.insert_one(notebook_doc)
+        return True
+    except DuplicateKeyError:
+        # Notebook already exists for this user, which is fine
+        return True
+    except Exception:
+        return False
+
+
+async def get_notebooks_by_user(username: str) -> List[dict]:
+    """
+    Get all notebooks for a user.
+    Returns a list of notebook documents, or empty list if error.
+    """
+    collection = await get_notebooks_collection()
+    if collection is None:
+        return []
+
+    try:
+        cursor = collection.find({"username": username}).sort("created_at", -1)
+        notebooks = await cursor.to_list(length=None)
+        return notebooks
+    except Exception:
+        return []
+
+
+async def delete_notebook_from_db(username: str, notebook_id: str) -> bool:
+    """
+    Delete a notebook from the database for a user.
+    Returns True if successful (including if notebook didn't exist), False if database error.
+    """
+    collection = await get_notebooks_collection()
+    if collection is None:
+        return False
+
+    try:
+        result = await collection.delete_one(
+            {"username": username, "notebook_id": notebook_id}
+        )
+        # Return True even if no document was deleted (notebook didn't exist)
+        return True
+    except Exception:
+        return False
 
 
 async def close_db_client():
