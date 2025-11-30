@@ -10,6 +10,10 @@ from playwright.async_api import Page
 from app.auth import CurrentUser
 from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.models import (
+    ArtifactDeleteResponse,
+    ArtifactDownloadResponse,
+    ArtifactInfo,
+    ArtifactListResponse,
     AudioOverviewCreateResponse,
     AudioOverviewDeleteResponse,
     AudioOverviewDownloadResponse,
@@ -39,9 +43,11 @@ from app.models import (
 from app.utils.browser_state import get_browser_page
 from app.utils.db import delete_notebook_from_db, get_notebooks_by_user, save_notebook
 from app.utils.notebooklm import (
+    trigger_artifact_deletion,
+    trigger_artifact_download,
+    trigger_artifact_listing,
     trigger_audio_overview_creation,
     trigger_audio_overview_deletion,
-    trigger_audio_overview_download,
     trigger_audio_overview_rename,
     trigger_audio_overview_status,
     trigger_chat_history,
@@ -54,7 +60,6 @@ from app.utils.notebooklm import (
     trigger_source_upload,
     trigger_video_overview_creation,
     trigger_video_overview_deletion,
-    trigger_video_overview_download,
     trigger_video_overview_rename,
     trigger_video_overview_status,
 )
@@ -752,74 +757,6 @@ async def rename_audio_overview_endpoint(
     )
 
 
-@router.get(
-    "/notebooks/{notebook_id}/audio-overview/download",
-    status_code=status.HTTP_200_OK,
-)
-async def download_audio_overview_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-):
-    """
-    Download an audio overview from a notebook.
-    Returns the audio file as a downloadable file response.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_audio_overview_download(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while downloading audio overview.",
-        ) from exc
-
-    download_path = result.get("download_path")
-    suggested_filename = result.get("suggested_filename")
-
-    if not download_path or not os.path.exists(download_path):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Downloaded file not found. The download may have failed.",
-        )
-
-    # Return the file as a downloadable response
-    return FileResponse(
-        path=download_path,
-        filename=suggested_filename or "audio_overview.m4a",
-        media_type="audio/mp4",  # m4a files use audio/mp4 MIME type
-    )
-
-
 @router.delete(
     "/notebooks/{notebook_id}/audio-overview",
     response_model=AudioOverviewDeleteResponse,
@@ -1056,77 +993,6 @@ async def rename_video_overview_endpoint(
     )
 
 
-@router.get(
-    "/notebooks/{notebook_id}/video-overview/download",
-    status_code=status.HTTP_200_OK,
-)
-async def download_video_overview_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-    video_name: Optional[str] = None,
-):
-    """
-    Download a video overview from a notebook.
-    Returns the video file as a downloadable file response.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_video_overview_download(
-            page, notebook_id, video_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while downloading video overview.",
-        ) from exc
-
-    download_path = result.get("download_path")
-    suggested_filename = result.get("suggested_filename")
-
-    if not download_path or not os.path.exists(download_path):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Downloaded file not found. The download may have failed.",
-        )
-
-    # Return the file as a downloadable response
-    return FileResponse(
-        path=download_path,
-        filename=suggested_filename or "video_overview.mp4",
-        media_type="video/mp4",
-    )
-
-
 @router.delete(
     "/notebooks/{notebook_id}/video-overview",
     response_model=VideoOverviewDeleteResponse,
@@ -1184,4 +1050,212 @@ async def delete_video_overview_endpoint(
     return VideoOverviewDeleteResponse(
         status=result["status"],
         message=result["message"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/artifacts",
+    response_model=ArtifactListResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def list_artifacts_endpoint(
+    notebook_id: str,
+    current_user: CurrentUser,
+) -> ArtifactListResponse:
+    """
+    List all artifacts (materials) in a notebook with their status.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_artifact_listing(page, notebook_id)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while listing artifacts from NotebookLM notebook.",
+        ) from exc
+
+    # Convert artifact dicts to ArtifactInfo objects
+    artifacts = [
+        ArtifactInfo(
+            type=artifact.get("type"),
+            name=artifact.get("name"),
+            details=artifact.get("details"),
+            status=artifact.get("status", "unknown"),
+            is_generating=artifact.get("is_generating", False),
+            has_play=artifact.get("has_play", False),
+            has_interactive=artifact.get("has_interactive", False),
+        )
+        for artifact in result.get("artifacts", [])
+    ]
+
+    return ArtifactListResponse(
+        status=result["status"],
+        message=result["message"],
+        artifacts=artifacts,
+    )
+
+
+@router.delete(
+    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}",
+    response_model=ArtifactDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def delete_artifact_endpoint(
+    notebook_id: str,
+    artifact_name: str,
+    current_user: CurrentUser,
+) -> ArtifactDeleteResponse:
+    """
+    Delete an artifact from a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_artifact_deletion(page, notebook_id, artifact_name)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while deleting artifact from NotebookLM notebook.",
+        ) from exc
+
+    return ArtifactDeleteResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/download",
+    status_code=status.HTTP_200_OK,
+)
+async def download_artifact_endpoint(
+    notebook_id: str,
+    artifact_name: str,
+    current_user: CurrentUser,
+):
+    """
+    Download an artifact (audio or video overview) from a notebook.
+    Returns the file as a downloadable file response.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_artifact_download(page, notebook_id, artifact_name)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while downloading artifact from NotebookLM notebook.",
+        ) from exc
+
+    download_path = result.get("download_path")
+    suggested_filename = result.get("suggested_filename")
+    artifact_type = result.get("artifact_type")
+
+    if not download_path or not os.path.exists(download_path):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Downloaded file not found. The download may have failed.",
+        )
+
+    # Determine media type and default filename based on artifact type
+    if artifact_type == "video_overview":
+        default_filename = suggested_filename or "video_overview.mp4"
+        media_type = "video/mp4"
+    else:  # audio_overview
+        default_filename = suggested_filename or "audio_overview.m4a"
+        media_type = "audio/mp4"  # m4a files use audio/mp4 MIME type
+
+    # Return the file as a downloadable response
+    return FileResponse(
+        path=download_path,
+        filename=default_filename,
+        media_type=media_type,
     )

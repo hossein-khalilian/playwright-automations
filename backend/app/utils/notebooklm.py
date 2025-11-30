@@ -2,6 +2,11 @@ from typing import Any, Dict, Optional
 
 from playwright.async_api import Page
 
+from app.automation.tasks.notebooklm.artifacts import (
+    delete_artifact,
+    download_artifact,
+    list_artifacts,
+)
 from app.automation.tasks.notebooklm.audio_overview import (
     create_audio_overview,
     delete_audio_overview,
@@ -246,5 +251,42 @@ async def trigger_video_overview_deletion(
     """
     try:
         return await delete_video_overview(page, notebook_id, video_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_artifact_listing(page: Page, notebook_id: str) -> Dict[str, Any]:
+    """
+    Thin wrapper to invoke the NotebookLM artifact listing task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await list_artifacts(page, notebook_id)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_artifact_deletion(
+    page: Page, notebook_id: str, artifact_name: str
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM artifact deletion task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await delete_artifact(page, notebook_id, artifact_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_artifact_download(
+    page: Page, notebook_id: str, artifact_name: str
+) -> Dict[str, Any]:
+    """
+    Thin wrapper to invoke the NotebookLM artifact download task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await download_artifact(page, notebook_id, artifact_name)
     except NotebookLMError:
         raise

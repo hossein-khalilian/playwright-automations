@@ -167,3 +167,32 @@ class VideoOverviewDeleteRequest(BaseModel):
 class VideoOverviewDeleteResponse(BaseModel):
     status: str = Field(description="Status of the deletion operation")
     message: str = Field(description="Message describing the result")
+
+
+class ArtifactInfo(BaseModel):
+    type: Optional[str] = Field(None, description="Type of artifact (audio_overview, video_overview, quiz, etc.)")
+    name: Optional[str] = Field(None, description="Name/title of the artifact")
+    details: Optional[str] = Field(None, description="Additional details (source count, time ago, etc.)")
+    status: str = Field(description="Status of the artifact (ready, generating, unknown)")
+    is_generating: bool = Field(False, description="Whether the artifact is currently being generated")
+    has_play: bool = Field(False, description="Whether the artifact has a play button (available for playback)")
+    has_interactive: bool = Field(False, description="Whether the artifact has interactive mode")
+
+
+class ArtifactListResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    artifacts: List[ArtifactInfo] = Field(default_factory=list, description="List of artifacts in the notebook")
+
+
+class ArtifactDeleteResponse(BaseModel):
+    status: str = Field(description="Status of the deletion operation")
+    message: str = Field(description="Message describing the result")
+
+
+class ArtifactDownloadResponse(BaseModel):
+    status: str = Field(description="Status of the download operation")
+    message: str = Field(description="Message describing the result")
+    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
+    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
+    artifact_type: Optional[str] = Field(None, description="Type of artifact that was downloaded")

@@ -12,59 +12,33 @@ from app.automation.tasks.notebooklm.helpers import close_dialogs, navigate_to_n
 
 async def _find_video_overview_buttons(page: Page) -> List[Any]:
     """
-    Helper function to find all video overview buttons on the page.
-    Returns a list of button locators if found, empty list otherwise.
+    Helper function to find all video overview buttons in the artifact library.
+    Returns a list of artifact button locators if found, empty list otherwise.
     """
     try:
         video_buttons = []
-        # Look for buttons that have a "More" button nearby (indicating they're artifacts)
-        buttons = page.locator("button")
-        button_count = await buttons.count()
-
-        for i in range(button_count):
+        
+        # Look for artifact-library-container
+        artifact_library = page.locator("div.artifact-library-container")
+        if await artifact_library.count() == 0:
+            return []
+        
+        # Find all artifact-library-item elements
+        artifact_items = artifact_library.locator("artifact-library-item")
+        item_count = await artifact_items.count()
+        
+        for i in range(item_count):
             try:
-                button = buttons.nth(i)
-                button_text = await button.inner_text()
+                artifact_item = artifact_items.nth(i)
                 
-                # Skip empty buttons or buttons that are clearly not video overviews
-                if not button_text or len(button_text.strip()) == 0:
-                    continue
+                # Look for the video icon (subscriptions) within this artifact item
+                video_icon = artifact_item.locator("mat-icon").filter(has_text="subscriptions")
                 
-                # Skip the "Create artifact" buttons
-                if "Create artifact" in button_text:
-                    continue
-                
-                # Check if this button has a "More" button nearby (indicating it's an artifact)
-                # The More button is typically a sibling or in the same container
-                try:
-                    # Try to find More button in the parent container
-                    parent = button.locator("xpath=..")
-                    more_button = parent.get_by_label("More")
-                    if await more_button.count() > 0:
-                        # Check if this button has a Play button, which indicates it's a video
-                        try:
-                            play_button = button.get_by_label("Play")
-                            if await play_button.count() > 0:
-                                video_buttons.append(button)
-                        except Exception:
-                            # Try alternative approach - check if it's in a video container
-                            try:
-                                # Video artifacts typically have specific patterns
-                                artifact_item = button.locator("xpath=ancestor::artifact-library-item").first
-                                if await artifact_item.count() > 0:
-                                    video_buttons.append(button)
-                            except Exception:
-                                pass
-                except Exception:
-                    # Try alternative approach - look for More button near this button
-                    try:
-                        more_button = page.get_by_label("More").filter(
-                            has=button
-                        )
-                        if await more_button.count() > 0:
-                            video_buttons.append(button)
-                    except Exception:
-                        continue
+                if await video_icon.count() > 0:
+                    # Found a video artifact, get the artifact button
+                    artifact_button = artifact_item.locator("button.artifact-button-content").first
+                    if await artifact_button.count() > 0:
+                        video_buttons.append(artifact_button)
             except Exception:
                 continue
         
@@ -222,8 +196,15 @@ async def get_video_overview_status(page: Page, notebook_id: str) -> Dict[str, A
         videos = []
         for video_button in video_buttons:
             try:
-                video_name = await video_button.inner_text()
-                video_name = video_name.strip() if video_name else None
+                # Extract the artifact title from the artifact-title element
+                title_element = video_button.locator("span.artifact-title")
+                if await title_element.count() > 0:
+                    video_name = await title_element.inner_text()
+                    video_name = video_name.strip() if video_name else None
+                else:
+                    # Fallback to inner text if title element not found
+                    video_name = await video_button.inner_text()
+                    video_name = video_name.strip() if video_name else None
                 if video_name:
                     videos.append({"name": video_name})
             except Exception:
@@ -283,7 +264,12 @@ async def rename_video_overview(
         
         for btn in video_buttons:
             try:
-                btn_text = await btn.inner_text()
+                # Extract the artifact title from the artifact-title element
+                title_element = btn.locator("span.artifact-title")
+                if await title_element.count() > 0:
+                    btn_text = await title_element.inner_text()
+                else:
+                    btn_text = await btn.inner_text()
                 if btn_text and btn_text.strip() == video_name:
                     video_button = btn
                     break
@@ -296,21 +282,18 @@ async def rename_video_overview(
                 "Please ensure a video overview with this name exists for this notebook."
             )
 
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The video overview may not be properly loaded."
+            )
+
         # Click the "More" button for the video overview
-        try:
-            # Find the More button in the same container as the video button
-            artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
-            if await artifact_item.count() == 0:
-                artifact_item = video_button.locator("xpath=..")
-            
-            more_button = artifact_item.get_by_label("More")
-            await more_button.wait_for(timeout=5_000)
-            await more_button.click()
-        except PlaywrightTimeoutError:
-            # Fallback: try to find More button directly
-            more_button = page.get_by_label("More").first
-            await more_button.wait_for(timeout=5_000)
-            await more_button.click()
+        more_button = artifact_item.get_by_label("More")
+        await more_button.wait_for(timeout=5_000)
+        await more_button.click()
 
         # Wait for the menu to appear
         await page.wait_for_timeout(500)
@@ -403,7 +386,12 @@ async def download_video_overview(
         if video_name:
             for btn in video_buttons:
                 try:
-                    btn_text = await btn.inner_text()
+                    # Extract the artifact title from the artifact-title element
+                    title_element = btn.locator("span.artifact-title")
+                    if await title_element.count() > 0:
+                        btn_text = await title_element.inner_text()
+                    else:
+                        btn_text = await btn.inner_text()
                     if btn_text and btn_text.strip() == video_name:
                         video_button = btn
                         break
@@ -422,37 +410,17 @@ async def download_video_overview(
         # Wait for the video button to be visible
         await video_button.wait_for(timeout=5_000, state="visible")
 
-        # Find the "More" button within the video artifact item
-        try:
-            # Get the parent artifact-library-item if video_button is a button
-            try:
-                artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
-                # Check if we found the parent
-                if await artifact_item.count() == 0:
-                    artifact_item = video_button.locator("xpath=..")
-            except Exception:
-                artifact_item = video_button.locator("xpath=..")
-            
-            # The More button is within the artifact item, with aria-label="More"
-            more_button = artifact_item.get_by_label("More")
-            await more_button.wait_for(timeout=10_000, state="visible")
-        except PlaywrightTimeoutError:
-            # Fallback: find by class
-            try:
-                try:
-                    artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
-                    if await artifact_item.count() == 0:
-                        artifact_item = video_button.locator("xpath=..")
-                except Exception:
-                    artifact_item = video_button.locator("xpath=..")
-                
-                more_button = artifact_item.locator("button.artifact-more-button")
-                await more_button.wait_for(timeout=10_000, state="visible")
-            except PlaywrightTimeoutError as exc:
-                raise NotebookLMError(
-                    "Could not find the 'More' button for the video overview. "
-                    "The artifact may not be fully loaded."
-                ) from exc
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The video overview may not be properly loaded."
+            )
+
+        # The More button is within the artifact item, with aria-label="More"
+        more_button = artifact_item.get_by_label("More")
+        await more_button.wait_for(timeout=10_000, state="visible")
 
         # Click the More button
         await more_button.click()
@@ -572,7 +540,12 @@ async def delete_video_overview(
         if video_name:
             for btn in video_buttons:
                 try:
-                    btn_text = await btn.inner_text()
+                    # Extract the artifact title from the artifact-title element
+                    title_element = btn.locator("span.artifact-title")
+                    if await title_element.count() > 0:
+                        btn_text = await title_element.inner_text()
+                    else:
+                        btn_text = await btn.inner_text()
                     if btn_text and btn_text.strip() == video_name:
                         video_button = btn
                         break
@@ -588,18 +561,16 @@ async def delete_video_overview(
             # Use the first video found
             video_button = video_buttons[0]
 
-        # Find the "More" button for this video overview
-        try:
-            artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
-            if await artifact_item.count() == 0:
-                artifact_item = video_button.locator("xpath=..")
-            
-            more_button = artifact_item.get_by_label("More")
-            if await more_button.count() == 0:
-                more_button = page.get_by_label("More").first
-        except Exception:
-            more_button = page.get_by_label("More").first
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = video_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The video overview may not be properly loaded."
+            )
 
+        # Find the "More" button for this video overview
+        more_button = artifact_item.get_by_label("More")
         await more_button.wait_for(timeout=5_000)
         await more_button.click()
 

@@ -12,46 +12,31 @@ from app.automation.tasks.notebooklm.helpers import close_dialogs, navigate_to_n
 
 async def _find_audio_overview_button(page: Page) -> Optional[Any]:
     """
-    Helper function to find the audio overview button on the page.
-    Returns the button locator if found, None otherwise.
+    Helper function to find the audio overview button in the artifact library.
+    Returns the artifact button locator if found, None otherwise.
     """
     try:
-        # Look for buttons that have a "More" button nearby (indicating they're artifacts)
-        # Audio overview buttons are typically visible buttons with text
-        buttons = page.locator("button")
-        button_count = await buttons.count()
-
-        for i in range(button_count):
+        # Look for artifact-library-container
+        artifact_library = page.locator("div.artifact-library-container")
+        if await artifact_library.count() == 0:
+            return None
+        
+        # Find all artifact-library-item elements
+        artifact_items = artifact_library.locator("artifact-library-item")
+        item_count = await artifact_items.count()
+        
+        for i in range(item_count):
             try:
-                button = buttons.nth(i)
-                button_text = await button.inner_text()
+                artifact_item = artifact_items.nth(i)
                 
-                # Skip empty buttons or buttons that are clearly not audio overviews
-                if not button_text or len(button_text.strip()) == 0:
-                    continue
+                # Look for the audio icon (audio_magic_eraser) within this artifact item
+                audio_icon = artifact_item.locator("mat-icon").filter(has_text="audio_magic_eraser")
                 
-                # Skip the "Create artifact" buttons
-                if "Create artifact" in button_text:
-                    continue
-                
-                # Check if this button has a "More" button nearby (indicating it's an artifact)
-                # The More button is typically a sibling or in the same container
-                try:
-                    # Try to find More button in the parent container
-                    parent = button.locator("xpath=..")
-                    more_button = parent.get_by_label("More")
-                    if await more_button.count() > 0:
-                        return button
-                except Exception:
-                    # Try alternative approach - look for More button near this button
-                    try:
-                        more_button = page.get_by_label("More").filter(
-                            has=button
-                        )
-                        if await more_button.count() > 0:
-                            return button
-                    except Exception:
-                        continue
+                if await audio_icon.count() > 0:
+                    # Found an audio artifact, get the artifact button
+                    artifact_button = artifact_item.locator("button.artifact-button-content").first
+                    if await artifact_button.count() > 0:
+                        return artifact_button
             except Exception:
                 continue
         
@@ -184,8 +169,15 @@ async def get_audio_overview_status(page: Page, notebook_id: str) -> Dict[str, A
 
         if audio_button:
             try:
-                audio_name = await audio_button.inner_text()
-                audio_name = audio_name.strip() if audio_name else None
+                # Extract the artifact title from the artifact-title element
+                title_element = audio_button.locator("span.artifact-title")
+                if await title_element.count() > 0:
+                    audio_name = await title_element.inner_text()
+                    audio_name = audio_name.strip() if audio_name else None
+                else:
+                    # Fallback to inner text if title element not found
+                    audio_name = await audio_button.inner_text()
+                    audio_name = audio_name.strip() if audio_name else None
             except Exception:
                 audio_name = None
 
@@ -245,8 +237,16 @@ async def rename_audio_overview(
                 "Please ensure an audio overview exists for this notebook."
             )
 
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = audio_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The audio overview may not be properly loaded."
+            )
+
         # Click the "More" button for the audio overview
-        more_button = audio_button.locator("..").get_by_label("More")
+        more_button = artifact_item.get_by_label("More")
         await more_button.wait_for(timeout=5_000)
         await more_button.click()
 
@@ -324,84 +324,26 @@ async def download_audio_overview(page: Page, notebook_id: str) -> Dict[str, Any
         except PlaywrightTimeoutError:
             await page.wait_for_timeout(2_000)
 
-        # Find the audio overview in the artifact library
-        # Look for artifact library item with audio icon (audio_magic_eraser)
-        try:
-            # Strategy 1: Find the artifact button that contains the audio icon
-            # The audio icon text is "audio_magic_eraser"
-            audio_buttons = page.locator("button.artifact-button-content")
-            button_count = await audio_buttons.count()
-            
-            audio_artifact = None
-            for i in range(button_count):
-                button = audio_buttons.nth(i)
-                # Check if this button contains the audio icon
-                icon = button.locator("mat-icon").filter(has_text=re.compile(r"audio_magic_eraser", re.IGNORECASE))
-                if await icon.count() > 0:
-                    audio_artifact = button
-                    break
-            
-            if not audio_artifact:
-                raise PlaywrightTimeoutError("Audio artifact button not found")
-            
-            await audio_artifact.wait_for(timeout=5_000, state="visible")
-        except (PlaywrightTimeoutError, Exception):
-            # Fallback: Find the artifact-library-item directly
-            try:
-                # Find all artifact items and check which one has the audio icon
-                artifact_items = page.locator("artifact-library-item")
-                item_count = await artifact_items.count()
-                
-                audio_artifact = None
-                for i in range(item_count):
-                    item = artifact_items.nth(i)
-                    icon = item.locator("mat-icon").filter(has_text=re.compile(r"audio_magic_eraser", re.IGNORECASE))
-                    if await icon.count() > 0:
-                        audio_artifact = item
-                        break
-                
-                if not audio_artifact:
-                    raise PlaywrightTimeoutError("Audio artifact item not found")
-                
-                await audio_artifact.wait_for(timeout=5_000, state="visible")
-            except PlaywrightTimeoutError as exc:
-                raise NotebookLMError(
-                    "Could not find the audio overview in the artifact library. "
-                    "Please ensure an audio overview exists for this notebook."
-                ) from exc
+        # Find the audio overview button using the helper
+        audio_button = await _find_audio_overview_button(page)
 
-        # Find the "More" button within the audio artifact item
-        # The More button is in the same artifact-library-item as the artifact button
-        try:
-            # Get the parent artifact-library-item if audio_artifact is a button
-            try:
-                artifact_item = audio_artifact.locator("xpath=ancestor::artifact-library-item").first
-                # Check if we found the parent
-                if await artifact_item.count() == 0:
-                    artifact_item = audio_artifact
-            except Exception:
-                artifact_item = audio_artifact
-            
-            # The More button is within the artifact item, with aria-label="More"
-            more_button = artifact_item.get_by_label("More")
-            await more_button.wait_for(timeout=10_000, state="visible")
-        except PlaywrightTimeoutError:
-            # Fallback: find by class
-            try:
-                try:
-                    artifact_item = audio_artifact.locator("xpath=ancestor::artifact-library-item").first
-                    if await artifact_item.count() == 0:
-                        artifact_item = audio_artifact
-                except Exception:
-                    artifact_item = audio_artifact
-                
-                more_button = artifact_item.locator("button.artifact-more-button")
-                await more_button.wait_for(timeout=10_000, state="visible")
-            except PlaywrightTimeoutError as exc:
-                raise NotebookLMError(
-                    "Could not find the 'More' button for the audio overview. "
-                    "The artifact may not be fully loaded."
-                ) from exc
+        if not audio_button:
+            raise NotebookLMError(
+                "Could not find the audio overview in the artifact library. "
+                "Please ensure an audio overview exists for this notebook."
+            )
+
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = audio_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The audio overview may not be properly loaded."
+            )
+
+        # The More button is within the artifact item, with aria-label="More"
+        more_button = artifact_item.get_by_label("More")
+        await more_button.wait_for(timeout=10_000, state="visible")
 
         # Click the More button
         await more_button.click()
@@ -499,14 +441,16 @@ async def delete_audio_overview(page: Page, notebook_id: str) -> Dict[str, str]:
                 "Please ensure an audio overview exists for this notebook."
             )
 
-        # Find the "More" button for this audio overview
-        try:
-            more_button = audio_button.locator("xpath=..").get_by_label("More")
-            if await more_button.count() == 0:
-                more_button = page.get_by_label("More").first
-        except Exception:
-            more_button = page.get_by_label("More").first
+        # Find the parent artifact-library-item to get the More button
+        artifact_item = audio_button.locator("xpath=ancestor::artifact-library-item").first
+        if await artifact_item.count() == 0:
+            raise NotebookLMError(
+                "Could not find the artifact item container. "
+                "The audio overview may not be properly loaded."
+            )
 
+        # Find the "More" button for this audio overview
+        more_button = artifact_item.get_by_label("More")
         await more_button.wait_for(timeout=5_000)
         await more_button.click()
 
