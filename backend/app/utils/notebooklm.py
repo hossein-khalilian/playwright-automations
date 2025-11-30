@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from playwright.async_api import Page
 
@@ -8,6 +8,13 @@ from app.automation.tasks.notebooklm.audio_overview import (
     download_audio_overview,
     get_audio_overview_status,
     rename_audio_overview,
+)
+from app.automation.tasks.notebooklm.video_overview import (
+    create_video_overview,
+    delete_video_overview,
+    download_video_overview,
+    get_video_overview_status,
+    rename_video_overview,
 )
 from app.automation.tasks.notebooklm.chat import (
     delete_chat_history,
@@ -176,5 +183,68 @@ async def trigger_audio_overview_deletion(
     """
     try:
         return await delete_audio_overview(page, notebook_id)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_video_overview_creation(
+    page: Page, notebook_id: str
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM video overview creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_video_overview(page, notebook_id)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_video_overview_status(page: Page, notebook_id: str) -> Dict[str, Any]:
+    """
+    Thin wrapper to invoke the NotebookLM video overview status retrieval task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await get_video_overview_status(page, notebook_id)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_video_overview_rename(
+    page: Page, notebook_id: str, video_name: str, new_name: str
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM video overview rename task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await rename_video_overview(page, notebook_id, video_name, new_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_video_overview_download(
+    page: Page, notebook_id: str, video_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Thin wrapper to invoke the NotebookLM video overview download task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await download_video_overview(page, notebook_id, video_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_video_overview_deletion(
+    page: Page, notebook_id: str, video_name: Optional[str] = None
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM video overview deletion task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await delete_video_overview(page, notebook_id, video_name)
     except NotebookLMError:
         raise

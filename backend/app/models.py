@@ -121,3 +121,49 @@ class AudioOverviewDownloadResponse(BaseModel):
 class AudioOverviewDeleteResponse(BaseModel):
     status: str = Field(description="Status of the deletion operation")
     message: str = Field(description="Message describing the result")
+
+
+class VideoOverviewCreateResponse(BaseModel):
+    status: str = Field(description="Status of the video overview creation")
+    message: str = Field(description="Message describing the result")
+
+
+class VideoInfo(BaseModel):
+    name: str = Field(description="Name of the video overview")
+
+
+class VideoOverviewStatusResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    is_generating: bool = Field(description="Whether the video overview is currently being generated")
+    videos: List[VideoInfo] = Field(default_factory=list, description="List of video overviews if they exist")
+
+
+class VideoOverviewRenameRequest(BaseModel):
+    video_name: str = Field(description="The current name of the video overview to rename")
+    new_name: str = Field(description="The new name for the video overview")
+
+
+class VideoOverviewRenameResponse(BaseModel):
+    status: str = Field(description="Status of the rename operation")
+    message: str = Field(description="Message describing the result")
+
+
+class VideoOverviewDownloadRequest(BaseModel):
+    video_name: Optional[str] = Field(None, description="Optional name of the specific video to download. If not provided, downloads the first video.")
+
+
+class VideoOverviewDownloadResponse(BaseModel):
+    status: str = Field(description="Status of the download operation")
+    message: str = Field(description="Message describing the result")
+    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
+    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
+
+
+class VideoOverviewDeleteRequest(BaseModel):
+    video_name: Optional[str] = Field(None, description="Optional name of the specific video to delete. If not provided, deletes the first video.")
+
+
+class VideoOverviewDeleteResponse(BaseModel):
+    status: str = Field(description="Status of the deletion operation")
+    message: str = Field(description="Message describing the result")
