@@ -1035,6 +1035,7 @@ async def download_artifact_endpoint(
     """
     Download an artifact (audio overview, video overview, or mind map) from a notebook.
     Returns the file as a downloadable file response.
+    For mind maps, returns a PNG screenshot of the mind map.
     """
     page = get_browser_page()
     if page is None:
@@ -1090,15 +1091,9 @@ async def download_artifact_endpoint(
         default_filename = suggested_filename or "video_overview.mp4"
         media_type = "video/mp4"
     elif artifact_type == "mind_map":
-        # Mind maps are typically JSON files
-        default_filename = suggested_filename or "mind_map.json"
-        # Determine media type from file extension
-        if suggested_filename and suggested_filename.endswith(".json"):
-            media_type = "application/json"
-        elif suggested_filename and suggested_filename.endswith(".txt"):
-            media_type = "text/plain"
-        else:
-            media_type = "application/octet-stream"
+        # Mind maps are returned as PNG files
+        default_filename = suggested_filename or "mind_map.png"
+        media_type = "image/png"
     else:  # audio_overview
         default_filename = suggested_filename or "audio_overview.m4a"
         media_type = "audio/mp4"  # m4a files use audio/mp4 MIME type

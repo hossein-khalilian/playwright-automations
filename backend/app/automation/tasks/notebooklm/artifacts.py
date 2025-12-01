@@ -1,6 +1,8 @@
 """Artifact listing operations for NotebookLM automation."""
 
+import os
 import re
+import tempfile
 from typing import Any, Dict, List, Optional
 
 from playwright.async_api import Page
@@ -537,6 +539,8 @@ async def rename_artifact(
 async def download_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[str, Any]:
     """
     Downloads an artifact (audio overview, video overview, or mind map) from a notebook.
+    
+    For mind maps, creates a PNG screenshot of the mind map view.
 
     Args:
         page: The Playwright Page object to use for automation
@@ -544,7 +548,8 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
         artifact_name: The name/title of the artifact to download
 
     Returns:
-        Dictionary with status, message, and download info
+        Dictionary with status, message, and download info.
+        For mind maps, the download_path points to a PNG file.
 
     Raises:
         NotebookLMError: If downloading artifact fails
@@ -686,12 +691,21 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
         
         try:
             if artifact_type == "mind_map":
-                # Mind map downloads require clicking the artifact button, collapsing nodes, then downloading
+                # Mind map downloads require clicking the artifact button, collapsing nodes, then taking a PNG screenshot
                 # Click the artifact button to open it
                 await artifact_button.click()
                 
                 # Wait for the mind map view to load
                 await page.wait_for_timeout(2_000)
+                
+                # Wait for the SVG to be present in the DOM
+                try:
+                    svg_locator = page.locator("mindmap-viewer svg")
+                    await svg_locator.wait_for(timeout=10_000, state="visible")
+                except PlaywrightTimeoutError:
+                    raise NotebookLMError(
+                        "Mind map SVG not found. The mind map view may not have loaded correctly."
+                    )
                 
                 # Click the button with the artifact name (may be needed to focus/select the mindmap)
                 try:
@@ -713,14 +727,20 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                     # If collapse button is not found, continue anyway
                     pass
                 
-                # Set up download listener and click Download button
-                async with page.expect_download() as download_info:
-                    download_button = page.get_by_role("button", name="Download")
-                    await download_button.wait_for(timeout=10_000, state="visible")
-                    await download_button.click()
+                # Wait a bit more for any animations to settle
+                await page.wait_for_timeout(500)
                 
-                # Get the download
-                download = await download_info.value
+                # Take screenshot of the SVG element to create PNG
+                with tempfile.NamedTemporaryFile(
+                    suffix='.png', delete=False
+                ) as temp_png:
+                    png_temp_file = temp_png.name
+                
+                await svg_locator.screenshot(path=png_temp_file)
+                
+                download_path_str = png_temp_file
+                safe_name = artifact_name.replace(' ', '_').replace('/', '_')
+                suggested_filename = f"{safe_name}.png"
             elif artifact_type == "video_overview":
                 # Video downloads open a popup that needs to be closed
                 # Find and click the "More" button
@@ -742,6 +762,11 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                 
                 # Get the download
                 download = await download_info.value
+                
+                # Get download path and convert to string
+                download_path = await download.path()
+                download_path_str = str(download_path) if download_path else None
+                suggested_filename = download.suggested_filename
             else:
                 # Audio downloads don't need popup handling
                 # Find and click the "More" button
@@ -758,11 +783,11 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                 
                 # Get the download
                 download = await download_info.value
-
-            # Get download path and convert to string
-            download_path = await download.path()
-            download_path_str = str(download_path) if download_path else None
-            suggested_filename = download.suggested_filename
+                
+                # Get download path and convert to string
+                download_path = await download.path()
+                download_path_str = str(download_path) if download_path else None
+                suggested_filename = download.suggested_filename
         except Exception as exc:
             raise NotebookLMError(
                 f"Failed to download artifact '{artifact_name}': {exc}"
