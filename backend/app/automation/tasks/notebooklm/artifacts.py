@@ -536,7 +536,7 @@ async def rename_artifact(
 
 async def download_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[str, Any]:
     """
-    Downloads an artifact (audio or video overview) from a notebook.
+    Downloads an artifact (audio overview, video overview, or mind map) from a notebook.
 
     Args:
         page: The Playwright Page object to use for automation
@@ -589,13 +589,15 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                     if await icon_element.count() > 0:
                         icon_text = await icon_element.inner_text()
                         icon_text = icon_text.strip() if icon_text else ""
-                        # Check if it's audio or video
+                        # Check if it's audio, video, or mind map
                         if "audio_magic_eraser" in icon_text:
                             artifact_type = "audio_overview"
                         elif "subscriptions" in icon_text:
                             artifact_type = "video_overview"
+                        elif "flowchart" in icon_text:
+                            artifact_type = "mind_map"
                         else:
-                            continue  # Skip non-audio/video artifacts
+                            continue  # Skip unsupported artifacts
                     
                     # First, try to match by artifact title (more precise)
                     title_element = button.locator("span.artifact-title").first
@@ -635,6 +637,8 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                                 artifact_type = "audio_overview"
                             elif "subscriptions" in icon_text:
                                 artifact_type = "video_overview"
+                            elif "flowchart" in icon_text:
+                                artifact_type = "mind_map"
                             else:
                                 continue
                         
@@ -660,14 +664,14 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
             
             if not artifact_button or not artifact_item:
                 raise NotebookLMError(
-                    f"Could not find audio or video artifact with name '{artifact_name}'. "
-                    "Please ensure the artifact exists and is of type audio_overview or video_overview."
+                    f"Could not find artifact with name '{artifact_name}'. "
+                    "Please ensure the artifact exists and is of type audio_overview, video_overview, or mind_map."
                 )
             
             if not artifact_type:
                 raise NotebookLMError(
-                    f"Artifact '{artifact_name}' is not an audio or video overview. "
-                    "Only audio_overview and video_overview artifacts can be downloaded."
+                    f"Artifact '{artifact_name}' is not a supported type. "
+                    "Only audio_overview, video_overview, and mind_map artifacts can be downloaded."
                 )
         except NotebookLMError:
             raise
@@ -676,21 +680,57 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                 f"Error finding artifact '{artifact_name}': {exc}"
             ) from exc
 
-        # Find and click the "More" button
-        more_button = artifact_item.get_by_label("More")
-        await more_button.wait_for(timeout=10_000, state="visible")
-        await more_button.click()
-
-        # Wait for the menu to appear and be ready
-        await page.wait_for_timeout(1_500)
-
-        # Set up download listener (video needs popup handling, audio doesn't)
+        # Set up download listener
         download_path_str = None
         suggested_filename = None
         
         try:
-            if artifact_type == "video_overview":
+            if artifact_type == "mind_map":
+                # Mind map downloads require clicking the artifact button, collapsing nodes, then downloading
+                # Click the artifact button to open it
+                await artifact_button.click()
+                
+                # Wait for the mind map view to load
+                await page.wait_for_timeout(2_000)
+                
+                # Click the button with the artifact name (may be needed to focus/select the mindmap)
+                try:
+                    artifact_name_button = page.get_by_role("button", name=artifact_name)
+                    await artifact_name_button.wait_for(timeout=10_000, state="visible")
+                    await artifact_name_button.click()
+                    await page.wait_for_timeout(500)
+                except PlaywrightTimeoutError:
+                    # If button with artifact name is not found, continue anyway
+                    pass
+                
+                # Click "Collapse all nodes" button
+                try:
+                    collapse_button = page.get_by_role("button", name="Collapse all nodes")
+                    await collapse_button.wait_for(timeout=10_000, state="visible")
+                    await collapse_button.click()
+                    await page.wait_for_timeout(500)
+                except PlaywrightTimeoutError:
+                    # If collapse button is not found, continue anyway
+                    pass
+                
+                # Set up download listener and click Download button
+                async with page.expect_download() as download_info:
+                    download_button = page.get_by_role("button", name="Download")
+                    await download_button.wait_for(timeout=10_000, state="visible")
+                    await download_button.click()
+                
+                # Get the download
+                download = await download_info.value
+            elif artifact_type == "video_overview":
                 # Video downloads open a popup that needs to be closed
+                # Find and click the "More" button
+                more_button = artifact_item.get_by_label("More")
+                await more_button.wait_for(timeout=10_000, state="visible")
+                await more_button.click()
+
+                # Wait for the menu to appear and be ready
+                await page.wait_for_timeout(1_500)
+                
                 async with page.expect_download() as download_info:
                     async with page.expect_popup() as popup_info:
                         # Click on "Download" menuitem
@@ -704,6 +744,14 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                 download = await download_info.value
             else:
                 # Audio downloads don't need popup handling
+                # Find and click the "More" button
+                more_button = artifact_item.get_by_label("More")
+                await more_button.wait_for(timeout=10_000, state="visible")
+                await more_button.click()
+
+                # Wait for the menu to appear and be ready
+                await page.wait_for_timeout(1_500)
+                
                 async with page.expect_download() as download_info:
                     # Click on "Download" menuitem
                     await _click_download_menuitem(page)
