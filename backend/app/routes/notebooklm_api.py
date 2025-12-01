@@ -52,13 +52,14 @@ from app.utils.notebooklm import (
     trigger_video_overview_creation,
 )
 
-router = APIRouter(prefix="/notebooklm", tags=["NotebookLM"])
+router = APIRouter(prefix="/notebooklm")
 
 
 @router.post(
     "/notebooks",
     response_model=NotebookCreateResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["Notebooks"],
 )
 async def create_notebook_endpoint(current_user: CurrentUser) -> NotebookCreateResponse:
     """
@@ -112,6 +113,7 @@ async def create_notebook_endpoint(current_user: CurrentUser) -> NotebookCreateR
     "/notebooks",
     response_model=NotebookListResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Notebooks"],
 )
 async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResponse:
     """
@@ -134,6 +136,7 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
 @router.delete(
     "/notebooks/{notebook_id}",
     status_code=status.HTTP_200_OK,
+    tags=["Notebooks"],
 )
 async def delete_notebook_endpoint(
     notebook_id: str,
@@ -197,6 +200,7 @@ async def delete_notebook_endpoint(
     "/notebooks/{notebook_id}/sources",
     response_model=SourceUploadResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Sources"],
 )
 async def add_source_to_notebook_endpoint(
     notebook_id: str,
@@ -276,6 +280,7 @@ async def add_source_to_notebook_endpoint(
     "/notebooks/{notebook_id}/sources",
     response_model=SourceListResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Sources"],
 )
 async def list_sources_endpoint(
     notebook_id: str,
@@ -354,6 +359,7 @@ async def list_sources_endpoint(
 @router.delete(
     "/notebooks/{notebook_id}/sources/{source_name:path}",
     status_code=status.HTTP_200_OK,
+    tags=["Sources"],
 )
 async def delete_source_endpoint(
     notebook_id: str,
@@ -412,6 +418,7 @@ async def delete_source_endpoint(
     "/notebooks/{notebook_id}/sources/{source_name:path}/rename",
     response_model=SourceRenameResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Sources"],
 )
 async def rename_source_endpoint(
     notebook_id: str,
@@ -471,6 +478,7 @@ async def rename_source_endpoint(
     "/notebooks/{notebook_id}/sources/{source_name:path}/review",
     response_model=SourceReviewResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Sources"],
 )
 async def review_source_endpoint(
     notebook_id: str,
@@ -543,6 +551,7 @@ async def review_source_endpoint(
     "/notebooks/{notebook_id}/query",
     response_model=NotebookQueryResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Chat"],
 )
 async def query_notebook_endpoint(
     notebook_id: str,
@@ -602,6 +611,7 @@ async def query_notebook_endpoint(
     "/notebooks/{notebook_id}/chat",
     response_model=ChatHistoryResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Chat"],
 )
 async def get_chat_history_endpoint(
     notebook_id: str,
@@ -665,6 +675,7 @@ async def get_chat_history_endpoint(
 @router.delete(
     "/notebooks/{notebook_id}/chat",
     status_code=status.HTTP_200_OK,
+    tags=["Chat"],
 )
 async def delete_chat_history_endpoint(
     notebook_id: str,
@@ -722,6 +733,7 @@ async def delete_chat_history_endpoint(
     "/notebooks/{notebook_id}/audio-overview",
     response_model=AudioOverviewCreateResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Overviews"],
 )
 async def create_audio_overview_endpoint(
     notebook_id: str,
@@ -779,6 +791,7 @@ async def create_audio_overview_endpoint(
     "/notebooks/{notebook_id}/video-overview",
     response_model=VideoOverviewCreateResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Overviews"],
 )
 async def create_video_overview_endpoint(
     notebook_id: str,
@@ -836,6 +849,7 @@ async def create_video_overview_endpoint(
     "/notebooks/{notebook_id}/artifacts",
     response_model=ArtifactListResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
 )
 async def list_artifacts_endpoint(
     notebook_id: str,
@@ -908,6 +922,7 @@ async def list_artifacts_endpoint(
     "/notebooks/{notebook_id}/artifacts/{artifact_name:path}",
     response_model=ArtifactDeleteResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
 )
 async def delete_artifact_endpoint(
     notebook_id: str,
@@ -966,6 +981,7 @@ async def delete_artifact_endpoint(
     "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/rename",
     response_model=ArtifactRenameResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
 )
 async def rename_artifact_endpoint(
     notebook_id: str,
@@ -1026,6 +1042,7 @@ async def rename_artifact_endpoint(
 @router.get(
     "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/download",
     status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
 )
 async def download_artifact_endpoint(
     notebook_id: str,
