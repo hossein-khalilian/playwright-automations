@@ -75,6 +75,34 @@ class SourceListResponse(BaseModel):
     sources: List[Source] = Field(description="List of sources in the notebook")
 
 
+class SourceRenameRequest(BaseModel):
+    new_name: str = Field(description="The new name for the source")
+
+
+class SourceRenameResponse(BaseModel):
+    status: str = Field(description="Status of the rename operation")
+    message: str = Field(description="Message describing the result")
+
+
+class SourceImageInfo(BaseModel):
+    base64: Optional[str] = Field(None, description="Base64-encoded image data")
+    mime_type: Optional[str] = Field(None, description="MIME type of the image (e.g., image/png, image/jpeg)")
+
+
+class SourceReviewResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    title: Optional[str] = Field(None, description="Title/name of the source")
+    summary: Optional[str] = Field(None, description="Summary of the source content")
+    key_topics: List[str] = Field(
+        default_factory=list, description="List of key topics extracted from the source"
+    )
+    content: Optional[str] = Field(None, description="Full content/transcript of the source")
+    images: List[SourceImageInfo] = Field(
+        default_factory=list, description="List of images found in the source"
+    )
+
+
 class NotebookQueryRequest(BaseModel):
     query: str = Field(description="The query text to send to the notebook")
 

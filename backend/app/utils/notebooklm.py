@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from playwright.async_api import Page
 
@@ -20,6 +20,8 @@ from app.automation.tasks.notebooklm.sources import (
     add_source_to_notebook,
     delete_source,
     list_sources,
+    rename_source,
+    review_source,
 )
 from app.automation.tasks.notebooklm.video_overview import create_video_overview
 
@@ -79,6 +81,32 @@ async def trigger_source_deletion(
     """
     try:
         return await delete_source(page, notebook_id, source_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_source_rename(
+    page: Page, notebook_id: str, source_name: str, new_name: str
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM source rename task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await rename_source(page, notebook_id, source_name, new_name)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_source_review(
+    page: Page, notebook_id: str, source_name: str
+) -> Dict[str, Any]:
+    """
+    Thin wrapper to invoke the NotebookLM source review task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await review_source(page, notebook_id, source_name)
     except NotebookLMError:
         raise
 

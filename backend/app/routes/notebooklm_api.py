@@ -23,7 +23,11 @@ from app.models import (
     NotebookQueryRequest,
     NotebookQueryResponse,
     Source,
+    SourceImageInfo,
     SourceListResponse,
+    SourceRenameRequest,
+    SourceRenameResponse,
+    SourceReviewResponse,
     SourceUploadResponse,
     VideoOverviewCreateResponse,
 )
@@ -42,6 +46,8 @@ from app.utils.notebooklm import (
     trigger_notebook_query,
     trigger_source_deletion,
     trigger_source_listing,
+    trigger_source_rename,
+    trigger_source_review,
     trigger_source_upload,
     trigger_video_overview_creation,
 )
@@ -400,6 +406,137 @@ async def delete_source_endpoint(
         "status": result["status"],
         "message": result["message"],
     }
+
+
+@router.put(
+    "/notebooks/{notebook_id}/sources/{source_name:path}/rename",
+    response_model=SourceRenameResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def rename_source_endpoint(
+    notebook_id: str,
+    source_name: str,
+    request: SourceRenameRequest,
+    current_user: CurrentUser,
+) -> SourceRenameResponse:
+    """
+    Rename a source in a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_source_rename(page, notebook_id, source_name, request.new_name)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while renaming source in NotebookLM notebook.",
+        ) from exc
+
+    return SourceRenameResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.get(
+    "/notebooks/{notebook_id}/sources/{source_name:path}/review",
+    response_model=SourceReviewResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def review_source_endpoint(
+    notebook_id: str,
+    source_name: str,
+    current_user: CurrentUser,
+) -> SourceReviewResponse:
+    """
+    Get the review/content of a source in a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_source_review(page, notebook_id, source_name)
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while reviewing source in NotebookLM notebook.",
+        ) from exc
+
+    # Convert image dicts to SourceImageInfo objects
+    images = [
+        SourceImageInfo(
+            base64=img.get("base64"),
+            mime_type=img.get("mime_type"),
+        )
+        for img in result.get("images", [])
+    ]
+
+    return SourceReviewResponse(
+        status=result["status"],
+        message=result["message"],
+        title=result.get("title"),
+        summary=result.get("summary"),
+        key_topics=result.get("key_topics", []),
+        content=result.get("content"),
+        images=images,
+    )
 
 
 @router.post(
