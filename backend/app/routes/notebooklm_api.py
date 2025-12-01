@@ -1,7 +1,6 @@
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -11,15 +10,11 @@ from app.auth import CurrentUser
 from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.models import (
     ArtifactDeleteResponse,
-    ArtifactDownloadResponse,
     ArtifactInfo,
     ArtifactListResponse,
+    ArtifactRenameRequest,
+    ArtifactRenameResponse,
     AudioOverviewCreateResponse,
-    AudioOverviewDeleteResponse,
-    AudioOverviewDownloadResponse,
-    AudioOverviewRenameRequest,
-    AudioOverviewRenameResponse,
-    AudioOverviewStatusResponse,
     ChatHistoryResponse,
     ChatMessage,
     Notebook,
@@ -30,15 +25,7 @@ from app.models import (
     Source,
     SourceListResponse,
     SourceUploadResponse,
-    VideoInfo,
     VideoOverviewCreateResponse,
-    VideoOverviewDeleteRequest,
-    VideoOverviewDeleteResponse,
-    VideoOverviewDownloadRequest,
-    VideoOverviewDownloadResponse,
-    VideoOverviewRenameRequest,
-    VideoOverviewRenameResponse,
-    VideoOverviewStatusResponse,
 )
 from app.utils.browser_state import get_browser_page
 from app.utils.db import delete_notebook_from_db, get_notebooks_by_user, save_notebook
@@ -46,10 +33,8 @@ from app.utils.notebooklm import (
     trigger_artifact_deletion,
     trigger_artifact_download,
     trigger_artifact_listing,
+    trigger_artifact_rename,
     trigger_audio_overview_creation,
-    trigger_audio_overview_deletion,
-    trigger_audio_overview_rename,
-    trigger_audio_overview_status,
     trigger_chat_history,
     trigger_chat_history_deletion,
     trigger_notebook_creation,
@@ -59,9 +44,6 @@ from app.utils.notebooklm import (
     trigger_source_listing,
     trigger_source_upload,
     trigger_video_overview_creation,
-    trigger_video_overview_deletion,
-    trigger_video_overview_rename,
-    trigger_video_overview_status,
 )
 
 router = APIRouter(prefix="/notebooklm", tags=["NotebookLM"])
@@ -335,8 +317,26 @@ async def list_sources_endpoint(
             detail="Unexpected error while listing sources from NotebookLM notebook.",
         ) from exc
 
-    # Convert source names to Source objects
-    sources = [Source(name=name) for name in result.get("sources", [])]
+    # Convert raw source entries to Source objects, supporting both legacy (string)
+    # and new (dict with status) formats for safety.
+    raw_sources = result.get("sources", [])
+    sources: list[Source] = []
+    for item in raw_sources:
+        if isinstance(item, dict):
+            sources.append(
+                Source(
+                    name=item.get("name", "").strip() if item.get("name") else "",
+                    status=item.get("status", "unknown"),
+                )
+            )
+        else:
+            # Backwards compatibility: when automation returns only the name
+            sources.append(
+                Source(
+                    name=str(item).strip() if item is not None else "",
+                    status="unknown",
+                )
+            )
 
     return SourceListResponse(
         status=result["status"],
@@ -638,182 +638,6 @@ async def create_audio_overview_endpoint(
     )
 
 
-@router.get(
-    "/notebooks/{notebook_id}/audio-overview",
-    response_model=AudioOverviewStatusResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_audio_overview_status_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> AudioOverviewStatusResponse:
-    """
-    Get the status of the audio overview for a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_audio_overview_status(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while getting audio overview status.",
-        ) from exc
-
-    return AudioOverviewStatusResponse(
-        status=result["status"],
-        message=result["message"],
-        is_generating=result.get("is_generating", False),
-        audio_name=result.get("audio_name"),
-    )
-
-
-@router.put(
-    "/notebooks/{notebook_id}/audio-overview/rename",
-    response_model=AudioOverviewRenameResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def rename_audio_overview_endpoint(
-    notebook_id: str,
-    request: AudioOverviewRenameRequest,
-    current_user: CurrentUser,
-) -> AudioOverviewRenameResponse:
-    """
-    Rename an audio overview.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_audio_overview_rename(
-            page, notebook_id, request.new_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while renaming audio overview.",
-        ) from exc
-
-    return AudioOverviewRenameResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
-@router.delete(
-    "/notebooks/{notebook_id}/audio-overview",
-    response_model=AudioOverviewDeleteResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def delete_audio_overview_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> AudioOverviewDeleteResponse:
-    """
-    Delete an audio overview from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_audio_overview_deletion(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting audio overview.",
-        ) from exc
-
-    return AudioOverviewDeleteResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
 @router.post(
     "/notebooks/{notebook_id}/video-overview",
     response_model=VideoOverviewCreateResponse,
@@ -866,188 +690,6 @@ async def create_video_overview_endpoint(
         ) from exc
 
     return VideoOverviewCreateResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
-@router.get(
-    "/notebooks/{notebook_id}/video-overview",
-    response_model=VideoOverviewStatusResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_video_overview_status_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> VideoOverviewStatusResponse:
-    """
-    Get the status of the video overview for a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_video_overview_status(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while getting video overview status.",
-        ) from exc
-
-    # Convert video dicts to VideoInfo objects
-    videos = [VideoInfo(name=video["name"]) for video in result.get("videos", [])]
-
-    return VideoOverviewStatusResponse(
-        status=result["status"],
-        message=result["message"],
-        is_generating=result.get("is_generating", False),
-        videos=videos,
-    )
-
-
-@router.put(
-    "/notebooks/{notebook_id}/video-overview/rename",
-    response_model=VideoOverviewRenameResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def rename_video_overview_endpoint(
-    notebook_id: str,
-    request: VideoOverviewRenameRequest,
-    current_user: CurrentUser,
-) -> VideoOverviewRenameResponse:
-    """
-    Rename a video overview.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_video_overview_rename(
-            page, notebook_id, request.video_name, request.new_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while renaming video overview.",
-        ) from exc
-
-    return VideoOverviewRenameResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
-@router.delete(
-    "/notebooks/{notebook_id}/video-overview",
-    response_model=VideoOverviewDeleteResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def delete_video_overview_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-    video_name: Optional[str] = None,
-) -> VideoOverviewDeleteResponse:
-    """
-    Delete a video overview from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_video_overview_deletion(
-            page, notebook_id, video_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting video overview.",
-        ) from exc
-
-    return VideoOverviewDeleteResponse(
         status=result["status"],
         message=result["message"],
     )
@@ -1178,6 +820,67 @@ async def delete_artifact_endpoint(
         ) from exc
 
     return ArtifactDeleteResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.put(
+    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/rename",
+    response_model=ArtifactRenameResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def rename_artifact_endpoint(
+    notebook_id: str,
+    artifact_name: str,
+    request: ArtifactRenameRequest,
+    current_user: CurrentUser,
+) -> ArtifactRenameResponse:
+    """
+    Rename an audio or video overview artifact in a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_artifact_rename(
+            page, notebook_id, artifact_name, request.new_name
+        )
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while renaming artifact in NotebookLM notebook.",
+        ) from exc
+
+    return ArtifactRenameResponse(
         status=result["status"],
         message=result["message"],
     )

@@ -51,7 +51,9 @@ class Notebook(BaseModel):
 
 
 class NotebookListResponse(BaseModel):
-    notebooks: List[Notebook] = Field(description="List of notebooks for the current user")
+    notebooks: List[Notebook] = Field(
+        description="List of notebooks for the current user"
+    )
 
 
 class SourceUploadResponse(BaseModel):
@@ -61,6 +63,10 @@ class SourceUploadResponse(BaseModel):
 
 class Source(BaseModel):
     name: str = Field(description="Name of the source file")
+    status: str = Field(
+        default="unknown",
+        description="Status of the source (processing, ready, unknown)",
+    )
 
 
 class SourceListResponse(BaseModel):
@@ -87,39 +93,13 @@ class ChatMessage(BaseModel):
 class ChatHistoryResponse(BaseModel):
     status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")
-    messages: List[ChatMessage] = Field(description="List of chat messages in chronological order")
+    messages: List[ChatMessage] = Field(
+        description="List of chat messages in chronological order"
+    )
 
 
 class AudioOverviewCreateResponse(BaseModel):
     status: str = Field(description="Status of the audio overview creation")
-    message: str = Field(description="Message describing the result")
-
-
-class AudioOverviewStatusResponse(BaseModel):
-    status: str = Field(description="Status of the operation")
-    message: str = Field(description="Message describing the result")
-    is_generating: bool = Field(description="Whether the audio overview is currently being generated")
-    audio_name: Optional[str] = Field(None, description="Name of the audio overview if it exists")
-
-
-class AudioOverviewRenameRequest(BaseModel):
-    new_name: str = Field(description="The new name for the audio overview")
-
-
-class AudioOverviewRenameResponse(BaseModel):
-    status: str = Field(description="Status of the rename operation")
-    message: str = Field(description="Message describing the result")
-
-
-class AudioOverviewDownloadResponse(BaseModel):
-    status: str = Field(description="Status of the download operation")
-    message: str = Field(description="Message describing the result")
-    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
-    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
-
-
-class AudioOverviewDeleteResponse(BaseModel):
-    status: str = Field(description="Status of the deletion operation")
     message: str = Field(description="Message describing the result")
 
 
@@ -128,61 +108,36 @@ class VideoOverviewCreateResponse(BaseModel):
     message: str = Field(description="Message describing the result")
 
 
-class VideoInfo(BaseModel):
-    name: str = Field(description="Name of the video overview")
-
-
-class VideoOverviewStatusResponse(BaseModel):
-    status: str = Field(description="Status of the operation")
-    message: str = Field(description="Message describing the result")
-    is_generating: bool = Field(description="Whether the video overview is currently being generated")
-    videos: List[VideoInfo] = Field(default_factory=list, description="List of video overviews if they exist")
-
-
-class VideoOverviewRenameRequest(BaseModel):
-    video_name: str = Field(description="The current name of the video overview to rename")
-    new_name: str = Field(description="The new name for the video overview")
-
-
-class VideoOverviewRenameResponse(BaseModel):
-    status: str = Field(description="Status of the rename operation")
-    message: str = Field(description="Message describing the result")
-
-
-class VideoOverviewDownloadRequest(BaseModel):
-    video_name: Optional[str] = Field(None, description="Optional name of the specific video to download. If not provided, downloads the first video.")
-
-
-class VideoOverviewDownloadResponse(BaseModel):
-    status: str = Field(description="Status of the download operation")
-    message: str = Field(description="Message describing the result")
-    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
-    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
-
-
-class VideoOverviewDeleteRequest(BaseModel):
-    video_name: Optional[str] = Field(None, description="Optional name of the specific video to delete. If not provided, deletes the first video.")
-
-
-class VideoOverviewDeleteResponse(BaseModel):
-    status: str = Field(description="Status of the deletion operation")
-    message: str = Field(description="Message describing the result")
-
-
 class ArtifactInfo(BaseModel):
-    type: Optional[str] = Field(None, description="Type of artifact (audio_overview, video_overview, quiz, etc.)")
+    type: Optional[str] = Field(
+        None,
+        description="Type of artifact (audio_overview, video_overview, quiz, etc.)",
+    )
     name: Optional[str] = Field(None, description="Name/title of the artifact")
-    details: Optional[str] = Field(None, description="Additional details (source count, time ago, etc.)")
-    status: str = Field(description="Status of the artifact (ready, generating, unknown)")
-    is_generating: bool = Field(False, description="Whether the artifact is currently being generated")
-    has_play: bool = Field(False, description="Whether the artifact has a play button (available for playback)")
-    has_interactive: bool = Field(False, description="Whether the artifact has interactive mode")
+    details: Optional[str] = Field(
+        None, description="Additional details (source count, time ago, etc.)"
+    )
+    status: str = Field(
+        description="Status of the artifact (ready, generating, unknown)"
+    )
+    is_generating: bool = Field(
+        False, description="Whether the artifact is currently being generated"
+    )
+    has_play: bool = Field(
+        False,
+        description="Whether the artifact has a play button (available for playback)",
+    )
+    has_interactive: bool = Field(
+        False, description="Whether the artifact has interactive mode"
+    )
 
 
 class ArtifactListResponse(BaseModel):
     status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")
-    artifacts: List[ArtifactInfo] = Field(default_factory=list, description="List of artifacts in the notebook")
+    artifacts: List[ArtifactInfo] = Field(
+        default_factory=list, description="List of artifacts in the notebook"
+    )
 
 
 class ArtifactDeleteResponse(BaseModel):
@@ -190,9 +145,10 @@ class ArtifactDeleteResponse(BaseModel):
     message: str = Field(description="Message describing the result")
 
 
-class ArtifactDownloadResponse(BaseModel):
-    status: str = Field(description="Status of the download operation")
+class ArtifactRenameRequest(BaseModel):
+    new_name: str = Field(description="The new name for the artifact")
+
+
+class ArtifactRenameResponse(BaseModel):
+    status: str = Field(description="Status of the rename operation")
     message: str = Field(description="Message describing the result")
-    download_path: Optional[str] = Field(None, description="Path to the downloaded file")
-    suggested_filename: Optional[str] = Field(None, description="Suggested filename for the download")
-    artifact_type: Optional[str] = Field(None, description="Type of artifact that was downloaded")

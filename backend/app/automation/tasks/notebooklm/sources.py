@@ -156,7 +156,7 @@ async def list_sources(page: Page, notebook_id: str) -> Dict[str, Any]:
         await page.wait_for_timeout(1_000)
 
         # Find all source containers
-        source_containers = page.locator('.single-source-container')
+        source_containers = page.locator(".single-source-container")
         source_count = await source_containers.count()
 
         sources = []
@@ -164,13 +164,56 @@ async def list_sources(page: Page, notebook_id: str) -> Dict[str, Any]:
             try:
                 container = source_containers.nth(i)
                 # Get the source title from the source-title div
-                source_title_element = container.locator('.source-title')
+                source_title_element = container.locator(".source-title")
                 source_name = await source_title_element.inner_text()
                 # Clean up whitespace
                 source_name = source_name.strip() if source_name else ""
-                
-                if source_name:
-                    sources.append(source_name)
+
+                if not source_name:
+                    continue
+
+                # Determine source status.
+                # Heuristic based on UI:
+                # - If a loading spinner container is visible or the "More" button is disabled,
+                #   we consider the source to be in "processing" state.
+                # - Otherwise, we consider it "ready".
+                status = "ready"
+
+                try:
+                    loading_spinner_container = container.locator(
+                        ".loading-spinner-container"
+                    )
+                    if await loading_spinner_container.count() > 0:
+                        # If any spinner is visible, treat as processing
+                        spinner = loading_spinner_container.first
+                        if await spinner.is_visible():
+                            status = "processing"
+                except Exception:
+                    # Ignore errors when checking spinner; fall back to other checks
+                    pass
+
+                # Fallback: infer processing state from the "More" button if available
+                try:
+                    more_button = container.get_by_role("button", name="More")
+                    if await more_button.count() > 0:
+                        more_button = more_button.first
+                        disabled_attr = await more_button.get_attribute("disabled")
+                        class_attr = await more_button.get_attribute("class") or ""
+                        is_disabled = disabled_attr is not None or (
+                            "mat-mdc-button-disabled" in class_attr
+                        )
+                        if is_disabled and status == "ready":
+                            status = "processing"
+                except Exception:
+                    # If we cannot reliably read the button state, keep existing status
+                    pass
+
+                sources.append(
+                    {
+                        "name": source_name,
+                        "status": status,
+                    }
+                )
             except Exception:
                 # Skip sources that can't be read
                 continue

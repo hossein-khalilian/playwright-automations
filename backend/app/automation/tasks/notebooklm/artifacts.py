@@ -379,6 +379,161 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
         raise NotebookLMError(f"Failed to delete artifact: {exc}") from exc
 
 
+async def rename_artifact(
+    page: Page, notebook_id: str, artifact_name: str, new_name: str
+) -> Dict[str, str]:
+    """
+    Renames an audio or video overview artifact in a notebook.
+
+    Args:
+        page: The Playwright Page object to use for automation
+        notebook_id: The ID of the notebook
+        artifact_name: The current name/title of the artifact to rename
+        new_name: The new name for the artifact
+
+    Returns:
+        Dictionary with status and message
+
+    Raises:
+        NotebookLMError: If renaming the artifact fails
+    """
+    try:
+        # Navigate directly to the notebook page
+        await navigate_to_notebook(page, notebook_id)
+
+        # Close any dialogs that might appear
+        await close_dialogs(page)
+
+        # Wait for the artifact library to be ready
+        try:
+            artifact_library = page.locator("div.artifact-library-container")
+            await artifact_library.wait_for(timeout=30_000, state="visible")
+        except PlaywrightTimeoutError:
+            await page.wait_for_timeout(2_000)
+
+        # Find the artifact by name (audio or video only)
+        artifact_button = None
+        artifact_item = None
+        artifact_type = None
+
+        try:
+            artifact_items = artifact_library.locator("artifact-library-item")
+            item_count = await artifact_items.count()
+
+            # Check artifact-library-item elements
+            for i in range(item_count):
+                try:
+                    item = artifact_items.nth(i)
+                    button = item.locator("button.artifact-button-content").first
+                    if await button.count() == 0:
+                        continue
+
+                    # Get artifact type from icon
+                    icon_element = item.locator("mat-icon.artifact-icon").first
+                    if await icon_element.count() > 0:
+                        icon_text = await icon_element.inner_text()
+                        icon_text = icon_text.strip() if icon_text else ""
+                        # Only support audio/video artifacts here
+                        if "audio_magic_eraser" in icon_text:
+                            artifact_type = "audio_overview"
+                        elif "subscriptions" in icon_text:
+                            artifact_type = "video_overview"
+                        else:
+                            continue
+
+                    # First, try to match by artifact title (more precise)
+                    title_element = button.locator("span.artifact-title").first
+                    if await title_element.count() > 0:
+                        title_text = await title_element.inner_text()
+                        title_text = title_text.strip() if title_text else ""
+                        if title_text == artifact_name or artifact_name in title_text:
+                            artifact_button = button
+                            artifact_item = item
+                            break
+
+                    # Fallback: check full button text (includes name and details)
+                    button_text = await button.inner_text()
+                    button_text = button_text.strip() if button_text else ""
+                    if artifact_name in button_text:
+                        artifact_button = button
+                        artifact_item = item
+                        break
+                except Exception:
+                    continue
+
+            if not artifact_button or not artifact_item:
+                raise NotebookLMError(
+                    f"Could not find audio or video artifact with name '{artifact_name}'. "
+                    "Please ensure the artifact exists and is of type audio_overview or video_overview."
+                )
+
+            if not artifact_type:
+                raise NotebookLMError(
+                    f"Artifact '{artifact_name}' is not an audio or video overview. "
+                    "Only audio_overview and video_overview artifacts can be renamed."
+                )
+        except NotebookLMError:
+            raise
+        except Exception as exc:
+            raise NotebookLMError(
+                f"Error finding artifact '{artifact_name}' to rename: {exc}"
+            ) from exc
+
+        # Find and click the "More" button
+        more_button = artifact_item.get_by_label("More")
+        await more_button.wait_for(timeout=10_000, state="visible")
+        await more_button.click()
+
+        # Wait for the menu to appear
+        await page.wait_for_timeout(500)
+
+        # Click on "Rename" menuitem
+        try:
+            rename_menuitem = page.get_by_role("menuitem", name="Rename")
+            await rename_menuitem.wait_for(timeout=5_000, state="visible")
+            await rename_menuitem.click()
+        except PlaywrightTimeoutError as exc:
+            raise NotebookLMError(
+                "Could not find the 'Rename' menuitem. "
+                "The menu may not have appeared correctly."
+            ) from exc
+
+        # Wait for the textbox to be ready
+        await page.wait_for_timeout(500)
+
+        # Find and edit the textbox
+        try:
+            textbox = artifact_item.get_by_role("textbox")
+            if await textbox.count() == 0:
+                textbox = artifact_button.get_by_role("textbox")
+
+            textbox = textbox.first
+            await textbox.wait_for(timeout=5_000)
+            await textbox.dblclick()
+            await textbox.click()
+            # Select all and replace with new name
+            await textbox.press("ControlOrMeta+a")
+            await textbox.fill(new_name)
+            await textbox.press("Enter")
+        except PlaywrightTimeoutError as exc:
+            raise NotebookLMError(
+                "Could not find or edit the rename textbox. "
+                "The rename UI may not have appeared correctly."
+            ) from exc
+
+        # Wait for the rename to complete
+        await page.wait_for_timeout(1_000)
+
+        return {
+            "status": "success",
+            "message": f"Artifact '{artifact_name}' renamed to '{new_name}' successfully.",
+        }
+    except NotebookLMError:
+        raise
+    except Exception as exc:
+        raise NotebookLMError(f"Failed to rename artifact: {exc}") from exc
+
+
 async def download_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[str, Any]:
     """
     Downloads an artifact (audio or video overview) from a notebook.
