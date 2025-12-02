@@ -291,6 +291,133 @@ class FlashcardCreateResponse(BaseModel):
     message: str = Field(description="Message describing the result")
 
 
+class QuizQuestionCount(str, Enum):
+    FEWER = "Fewer"
+    STANDARD = "Standard"
+    MORE = "More"
+
+
+class QuizCreateRequest(BaseModel):
+    question_count: Optional[QuizQuestionCount] = Field(
+        None,
+        description='Number of questions - "Fewer", "Standard", or "More"',
+    )
+    difficulty: Optional[FlashcardDifficulty] = Field(
+        None,
+        description='Level of difficulty - "Easy", "Medium", or "Hard"',
+    )
+    topic: Optional[str] = Field(
+        None,
+        description="Optional topic description for the quiz (max 5000 chars)",
+        max_length=5000,
+    )
+
+
+class QuizCreateResponse(BaseModel):
+    status: str = Field(description="Status of the quiz creation")
+    message: str = Field(description="Message describing the result")
+
+
+class InfographicOrientation(str, Enum):
+    LANDSCAPE = "Landscape"
+    PORTRAIT = "Portrait"
+    SQUARE = "Square"
+
+
+class InfographicDetailLevel(str, Enum):
+    CONCISE = "Concise"
+    STANDARD = "Standard"
+    DETAILED = "Detailed BETA"
+
+
+class InfographicCreateRequest(BaseModel):
+    language: Optional[AudioLanguage] = Field(
+        None,
+        description="Language - 'english' or 'persian'",
+    )
+    orientation: Optional[InfographicOrientation] = Field(
+        None,
+        description='Orientation - "Landscape", "Portrait", or "Square"',
+    )
+    detail_level: Optional[InfographicDetailLevel] = Field(
+        None,
+        description='Level of detail - "Concise", "Standard", or "Detailed BETA"',
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Optional description for the infographic (max 5000 chars)",
+        max_length=5000,
+    )
+
+
+class InfographicCreateResponse(BaseModel):
+    status: str = Field(description="Status of the infographic creation")
+    message: str = Field(description="Message describing the result")
+
+
+class SlideDeckFormat(str, Enum):
+    DETAILED_DECK = "Detailed Deck"
+    PRESENTER_SLIDES = "Presenter Slides"
+
+
+class SlideDeckLength(str, Enum):
+    SHORT = "Short"
+    DEFAULT = "Default"
+
+
+class SlideDeckCreateRequest(BaseModel):
+    format: Optional[SlideDeckFormat] = Field(
+        None,
+        description='Slide deck format - "Detailed Deck" or "Presenter Slides"',
+    )
+    length: Optional[SlideDeckLength] = Field(
+        None,
+        description='Slide deck length - "Short" or "Default"',
+    )
+    language: Optional[AudioLanguage] = Field(
+        None,
+        description="Language - 'english' or 'persian'",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Optional description for the slide deck (max 5000 chars)",
+        max_length=5000,
+    )
+
+
+class SlideDeckCreateResponse(BaseModel):
+    status: str = Field(description="Status of the slide deck creation")
+    message: str = Field(description="Message describing the result")
+
+
+class ReportFormat(str, Enum):
+    CREATE_YOUR_OWN = "Create Your Own"
+    BRIEFING_DOC = "Briefing Doc"
+    STUDY_GUIDE = "Study Guide"
+    BLOG_POST = "Blog Post"
+
+
+class ReportCreateRequest(BaseModel):
+    format: Optional[ReportFormat] = Field(
+        None,
+        description='Report format - "Create Your Own", "Briefing Doc", "Study Guide", "Blog Post", or other suggested formats',
+    )
+    language: Optional[AudioLanguage] = Field(
+        None,
+        description="Language - 'english' or 'persian'",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Description of the report to create (max 5000 chars)",
+        max_length=5000,
+    )
+
+
+class ReportCreateResponse(BaseModel):
+    status: str = Field(description="Status of the report creation")
+    message: str = Field(description="Message describing the result")
+
+
 class ArtifactInfo(BaseModel):
     type: Optional[str] = Field(
         None,

@@ -24,7 +24,10 @@ from app.automation.tasks.notebooklm.sources import (
     review_source,
 )
 from app.automation.tasks.notebooklm.flashcards import create_flashcards
-from app.automation.tasks.notebooklm.flashcards import create_flashcards
+from app.automation.tasks.notebooklm.infographic import create_infographic
+from app.automation.tasks.notebooklm.quiz import create_quiz
+from app.automation.tasks.notebooklm.report import create_report
+from app.automation.tasks.notebooklm.slide_deck import create_slide_deck
 from app.automation.tasks.notebooklm.video_overview import create_video_overview
 
 
@@ -208,6 +211,80 @@ async def trigger_flashcard_creation(
     """
     try:
         return await create_flashcards(page, notebook_id, card_count, difficulty, topic)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_quiz_creation(
+    page: Page,
+    notebook_id: str,
+    question_count: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM quiz creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_quiz(page, notebook_id, question_count, difficulty, topic)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_infographic_creation(
+    page: Page,
+    notebook_id: str,
+    language: Optional[str] = None,
+    orientation: Optional[str] = None,
+    detail_level: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM infographic creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_infographic(
+            page, notebook_id, language, orientation, detail_level, description
+        )
+    except NotebookLMError:
+        raise
+
+
+async def trigger_slide_deck_creation(
+    page: Page,
+    notebook_id: str,
+    format: Optional[str] = None,
+    length: Optional[str] = None,
+    language: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM slide deck creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_slide_deck(
+            page, notebook_id, format, length, language, description
+        )
+    except NotebookLMError:
+        raise
+
+
+async def trigger_report_creation(
+    page: Page,
+    notebook_id: str,
+    format: Optional[str] = None,
+    language: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM report creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_report(page, notebook_id, format, language, description)
     except NotebookLMError:
         raise
 
