@@ -23,6 +23,8 @@ from app.automation.tasks.notebooklm.sources import (
     rename_source,
     review_source,
 )
+from app.automation.tasks.notebooklm.flashcards import create_flashcards
+from app.automation.tasks.notebooklm.flashcards import create_flashcards
 from app.automation.tasks.notebooklm.video_overview import create_video_overview
 
 
@@ -189,6 +191,23 @@ async def trigger_video_overview_creation(
             custom_style_description,
             focus_text,
         )
+    except NotebookLMError:
+        raise
+
+
+async def trigger_flashcard_creation(
+    page: Page,
+    notebook_id: str,
+    card_count: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM flashcard creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_flashcards(page, notebook_id, card_count, difficulty, topic)
     except NotebookLMError:
         raise
 

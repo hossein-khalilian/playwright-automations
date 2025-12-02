@@ -18,6 +18,8 @@ from app.models import (
     AudioOverviewCreateResponse,
     ChatHistoryResponse,
     ChatMessage,
+    FlashcardCreateRequest,
+    FlashcardCreateResponse,
     Notebook,
     NotebookCreateResponse,
     NotebookListResponse,
@@ -43,6 +45,7 @@ from app.utils.notebooklm import (
     trigger_audio_overview_creation,
     trigger_chat_history,
     trigger_chat_history_deletion,
+    trigger_flashcard_creation,
     trigger_notebook_creation,
     trigger_notebook_deletion,
     trigger_notebook_query,
@@ -458,7 +461,9 @@ async def rename_source_endpoint(
         )
 
     try:
-        result = await trigger_source_rename(page, notebook_id, source_name, request.new_name)
+        result = await trigger_source_rename(
+            page, notebook_id, source_name, request.new_name
+        )
     except NotebookLMError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -744,7 +749,7 @@ async def create_audio_overview_endpoint(
 ) -> AudioOverviewCreateResponse:
     """
     Create an audio overview for a notebook.
-    
+
     Optional parameters:
     - audio_format: "Deep Dive", "Brief", "Critique", or "Debate"
     - language: "english" or "persian"
@@ -816,7 +821,7 @@ async def create_video_overview_endpoint(
 ) -> VideoOverviewCreateResponse:
     """
     Create a video overview for a notebook.
-    
+
     Optional parameters:
     - video_format: "Explainer" or "Brief"
     - language: "english" or "persian"
@@ -872,6 +877,76 @@ async def create_video_overview_endpoint(
         ) from exc
 
     return VideoOverviewCreateResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.post(
+    "/notebooks/{notebook_id}/flashcards",
+    response_model=FlashcardCreateResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
+)
+async def create_flashcards_endpoint(
+    notebook_id: str,
+    request: FlashcardCreateRequest,
+    current_user: CurrentUser,
+) -> FlashcardCreateResponse:
+    """
+    Create flashcards for a notebook.
+
+    Optional parameters:
+    - card_count: "Fewer", "Standard", or "More"
+    - difficulty: "Easy", "Medium", or "Hard"
+    - topic: Optional topic description for the flashcards (max 5000 chars)
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_flashcard_creation(
+            page,
+            notebook_id,
+            card_count=request.card_count.value if request.card_count else None,
+            difficulty=request.difficulty.value if request.difficulty else None,
+            topic=request.topic,
+        )
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while creating flashcards.",
+        ) from exc
+
+    return FlashcardCreateResponse(
         status=result["status"],
         message=result["message"],
     )

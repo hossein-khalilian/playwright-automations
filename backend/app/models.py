@@ -87,7 +87,9 @@ class SourceRenameResponse(BaseModel):
 
 class SourceImageInfo(BaseModel):
     base64: Optional[str] = Field(None, description="Base64-encoded image data")
-    mime_type: Optional[str] = Field(None, description="MIME type of the image (e.g., image/png, image/jpeg)")
+    mime_type: Optional[str] = Field(
+        None, description="MIME type of the image (e.g., image/png, image/jpeg)"
+    )
 
 
 class SourceReviewResponse(BaseModel):
@@ -98,7 +100,9 @@ class SourceReviewResponse(BaseModel):
     key_topics: List[str] = Field(
         default_factory=list, description="List of key topics extracted from the source"
     )
-    content: Optional[str] = Field(None, description="Full content/transcript of the source")
+    content: Optional[str] = Field(
+        None, description="Full content/transcript of the source"
+    )
     images: List[SourceImageInfo] = Field(
         default_factory=list, description="List of images found in the source"
     )
@@ -150,7 +154,7 @@ class AudioOverviewCreateRequest(BaseModel):
     )
     length: Optional[str] = Field(
         None,
-        description='Audio length - depends on format: Deep Dive (Short/Default/Long), Brief (none), Critique/Debate (Short/Default)',
+        description="Audio length - depends on format: Deep Dive (Short/Default/Long), Brief (none), Critique/Debate (Short/Default)",
     )
     focus_text: Optional[str] = Field(
         None,
@@ -163,7 +167,7 @@ class AudioOverviewCreateRequest(BaseModel):
         """Validate length based on selected audio format."""
         if self.length is None or self.audio_format is None:
             return self
-        
+
         # Map format-specific valid lengths
         valid_lengths = {
             AudioFormat.DEEP_DIVE: ["Short", "Default", "Long"],
@@ -171,20 +175,20 @@ class AudioOverviewCreateRequest(BaseModel):
             AudioFormat.CRITIQUE: ["Short", "Default"],
             AudioFormat.DEBATE: ["Short", "Default"],
         }
-        
+
         valid_for_format = valid_lengths.get(self.audio_format, [])
-        
+
         # Brief format doesn't support length
         if self.audio_format == AudioFormat.BRIEF:
             raise ValueError("Brief format does not support length parameter")
-        
+
         # Check if length is valid for the format
         if valid_for_format and self.length not in valid_for_format:
             raise ValueError(
                 f"Invalid length '{self.length}' for format '{self.audio_format.value}'. "
                 f"Valid options: {', '.join(valid_for_format)}"
             )
-        
+
         return self
 
 
@@ -239,7 +243,10 @@ class VideoOverviewCreateRequest(BaseModel):
     def validate_custom_style_description(self):
         """Validate that custom_style_description is provided when visual_style is Custom."""
         if self.visual_style == VideoVisualStyle.CUSTOM:
-            if not self.custom_style_description or not self.custom_style_description.strip():
+            if (
+                not self.custom_style_description
+                or not self.custom_style_description.strip()
+            ):
                 raise ValueError(
                     "custom_style_description is required when visual_style is 'Custom'"
                 )
@@ -248,6 +255,39 @@ class VideoOverviewCreateRequest(BaseModel):
 
 class VideoOverviewCreateResponse(BaseModel):
     status: str = Field(description="Status of the video overview creation")
+    message: str = Field(description="Message describing the result")
+
+
+class FlashcardCardCount(str, Enum):
+    FEWER = "Fewer"
+    STANDARD = "Standard"
+    MORE = "More"
+
+
+class FlashcardDifficulty(str, Enum):
+    EASY = "Easy"
+    MEDIUM = "Medium"
+    HARD = "Hard"
+
+
+class FlashcardCreateRequest(BaseModel):
+    card_count: Optional[FlashcardCardCount] = Field(
+        None,
+        description='Number of cards - "Fewer", "Standard", or "More"',
+    )
+    difficulty: Optional[FlashcardDifficulty] = Field(
+        None,
+        description='Level of difficulty - "Easy", "Medium", or "Hard"',
+    )
+    topic: Optional[str] = Field(
+        None,
+        description="Optional topic description for the flashcards (max 5000 chars)",
+        max_length=5000,
+    )
+
+
+class FlashcardCreateResponse(BaseModel):
+    status: str = Field(description="Status of the flashcard creation")
     message: str = Field(description="Message describing the result")
 
 
