@@ -30,6 +30,7 @@ from app.models import (
     SourceRenameResponse,
     SourceReviewResponse,
     SourceUploadResponse,
+    VideoOverviewCreateRequest,
     VideoOverviewCreateResponse,
 )
 from app.utils.browser_state import get_browser_page
@@ -810,10 +811,18 @@ async def create_audio_overview_endpoint(
 )
 async def create_video_overview_endpoint(
     notebook_id: str,
+    request: VideoOverviewCreateRequest,
     current_user: CurrentUser,
 ) -> VideoOverviewCreateResponse:
     """
     Create a video overview for a notebook.
+    
+    Optional parameters:
+    - video_format: "Explainer" or "Brief"
+    - language: "english" or "persian"
+    - visual_style: "Auto-select", "Custom", "Classic", "Whiteboard", "Kawaii", "Anime", "Watercolor", "Retro print", "Heritage", or "Paper-craft"
+    - custom_style_description: Custom visual style description (required when visual_style is Custom, max 5000 chars)
+    - focus_text: Optional focus text for the AI hosts (max 5000 chars)
     """
     page = get_browser_page()
     if page is None:
@@ -842,7 +851,15 @@ async def create_video_overview_endpoint(
         )
 
     try:
-        result = await trigger_video_overview_creation(page, notebook_id)
+        result = await trigger_video_overview_creation(
+            page,
+            notebook_id,
+            video_format=request.video_format.value if request.video_format else None,
+            language=request.language.value if request.language else None,
+            visual_style=request.visual_style.value if request.visual_style else None,
+            custom_style_description=request.custom_style_description,
+            focus_text=request.focus_text,
+        )
     except NotebookLMError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

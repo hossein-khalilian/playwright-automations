@@ -167,14 +167,28 @@ async def trigger_audio_overview_creation(
 
 
 async def trigger_video_overview_creation(
-    page: Page, notebook_id: str
+    page: Page,
+    notebook_id: str,
+    video_format: Optional[str] = None,
+    language: Optional[str] = None,
+    visual_style: Optional[str] = None,
+    custom_style_description: Optional[str] = None,
+    focus_text: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     Thin wrapper to invoke the NotebookLM video overview creation task.
     Keeping this indirection makes it easier to swap implementations later.
     """
     try:
-        return await create_video_overview(page, notebook_id)
+        return await create_video_overview(
+            page,
+            notebook_id,
+            video_format,
+            language,
+            visual_style,
+            custom_style_description,
+            focus_text,
+        )
     except NotebookLMError:
         raise
 

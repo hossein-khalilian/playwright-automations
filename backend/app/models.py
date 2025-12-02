@@ -193,6 +193,59 @@ class AudioOverviewCreateResponse(BaseModel):
     message: str = Field(description="Message describing the result")
 
 
+class VideoFormat(str, Enum):
+    EXPLAINER = "Explainer"
+    BRIEF = "Brief"
+
+
+class VideoVisualStyle(str, Enum):
+    AUTO_SELECT = "Auto-select"
+    CUSTOM = "Custom"
+    CLASSIC = "Classic"
+    WHITEBOARD = "Whiteboard"
+    KAWAII = "Kawaii"
+    ANIME = "Anime"
+    WATERCOLOR = "Watercolor"
+    RETRO_PRINT = "Retro print"
+    HERITAGE = "Heritage"
+    PAPER_CRAFT = "Paper-craft"
+
+
+class VideoOverviewCreateRequest(BaseModel):
+    video_format: Optional[VideoFormat] = Field(
+        None,
+        description='Video format - "Explainer" or "Brief"',
+    )
+    language: Optional[AudioLanguage] = Field(
+        None,
+        description="Language - 'english' or 'persian'",
+    )
+    visual_style: Optional[VideoVisualStyle] = Field(
+        None,
+        description='Visual style - "Auto-select", "Custom", "Classic", "Whiteboard", "Kawaii", "Anime", "Watercolor", "Retro print", "Heritage", or "Paper-craft"',
+    )
+    custom_style_description: Optional[str] = Field(
+        None,
+        description="Custom visual style description (required when visual_style is Custom, max 5000 chars)",
+        max_length=5000,
+    )
+    focus_text: Optional[str] = Field(
+        None,
+        description="Optional focus text for the AI hosts (max 5000 chars)",
+        max_length=5000,
+    )
+
+    @model_validator(mode="after")
+    def validate_custom_style_description(self):
+        """Validate that custom_style_description is provided when visual_style is Custom."""
+        if self.visual_style == VideoVisualStyle.CUSTOM:
+            if not self.custom_style_description or not self.custom_style_description.strip():
+                raise ValueError(
+                    "custom_style_description is required when visual_style is 'Custom'"
+                )
+        return self
+
+
 class VideoOverviewCreateResponse(BaseModel):
     status: str = Field(description="Status of the video overview creation")
     message: str = Field(description="Message describing the result")
