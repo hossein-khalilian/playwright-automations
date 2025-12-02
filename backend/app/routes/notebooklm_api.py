@@ -14,6 +14,7 @@ from app.models import (
     ArtifactListResponse,
     ArtifactRenameRequest,
     ArtifactRenameResponse,
+    AudioOverviewCreateRequest,
     AudioOverviewCreateResponse,
     ChatHistoryResponse,
     ChatMessage,
@@ -737,10 +738,17 @@ async def delete_chat_history_endpoint(
 )
 async def create_audio_overview_endpoint(
     notebook_id: str,
+    request: AudioOverviewCreateRequest,
     current_user: CurrentUser,
 ) -> AudioOverviewCreateResponse:
     """
     Create an audio overview for a notebook.
+    
+    Optional parameters:
+    - audio_format: "Deep Dive", "Brief", "Critique", or "Debate"
+    - language: "english" or "persian"
+    - length: Format dependent - Deep Dive (Short/Default/Long), Brief (none), Critique/Debate (Short/Default)
+    - focus_text: Optional focus text for the AI hosts (max 5000 chars)
     """
     page = get_browser_page()
     if page is None:
@@ -769,7 +777,14 @@ async def create_audio_overview_endpoint(
         )
 
     try:
-        result = await trigger_audio_overview_creation(page, notebook_id)
+        result = await trigger_audio_overview_creation(
+            page,
+            notebook_id,
+            audio_format=request.audio_format.value if request.audio_format else None,
+            language=request.language.value if request.language else None,
+            length=request.length,
+            focus_text=request.focus_text,
+        )
     except NotebookLMError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

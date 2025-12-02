@@ -1,7 +1,8 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class GoogleLoginStatusResponse(BaseModel):
@@ -124,6 +125,67 @@ class ChatHistoryResponse(BaseModel):
     messages: List[ChatMessage] = Field(
         description="List of chat messages in chronological order"
     )
+
+
+class AudioFormat(str, Enum):
+    DEEP_DIVE = "Deep Dive"
+    BRIEF = "Brief"
+    CRITIQUE = "Critique"
+    DEBATE = "Debate"
+
+
+class AudioLanguage(str, Enum):
+    ENGLISH = "english"
+    PERSIAN = "persian"
+
+
+class AudioOverviewCreateRequest(BaseModel):
+    audio_format: Optional[AudioFormat] = Field(
+        None,
+        description='Audio format - "Deep Dive", "Brief", "Critique", or "Debate"',
+    )
+    language: Optional[AudioLanguage] = Field(
+        None,
+        description="Language - 'english' or 'persian'",
+    )
+    length: Optional[str] = Field(
+        None,
+        description='Audio length - depends on format: Deep Dive (Short/Default/Long), Brief (none), Critique/Debate (Short/Default)',
+    )
+    focus_text: Optional[str] = Field(
+        None,
+        description="Optional focus text for the AI hosts (max 5000 chars)",
+        max_length=5000,
+    )
+
+    @model_validator(mode="after")
+    def validate_length_for_format(self):
+        """Validate length based on selected audio format."""
+        if self.length is None or self.audio_format is None:
+            return self
+        
+        # Map format-specific valid lengths
+        valid_lengths = {
+            AudioFormat.DEEP_DIVE: ["Short", "Default", "Long"],
+            AudioFormat.BRIEF: [],  # No length option for Brief
+            AudioFormat.CRITIQUE: ["Short", "Default"],
+            AudioFormat.DEBATE: ["Short", "Default"],
+        }
+        
+        valid_for_format = valid_lengths.get(self.audio_format, [])
+        
+        # Brief format doesn't support length
+        if self.audio_format == AudioFormat.BRIEF:
+            raise ValueError("Brief format does not support length parameter")
+        
+        # Check if length is valid for the format
+        if valid_for_format and self.length not in valid_for_format:
+            raise ValueError(
+                f"Invalid length '{self.length}' for format '{self.audio_format.value}'. "
+                f"Valid options: {', '.join(valid_for_format)}"
+            )
+        
+        return self
 
 
 class AudioOverviewCreateResponse(BaseModel):

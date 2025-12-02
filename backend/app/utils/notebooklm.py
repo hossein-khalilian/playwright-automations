@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from playwright.async_api import Page
 
@@ -147,14 +147,21 @@ async def trigger_chat_history_deletion(page: Page, notebook_id: str) -> Dict[st
 
 
 async def trigger_audio_overview_creation(
-    page: Page, notebook_id: str
+    page: Page,
+    notebook_id: str,
+    audio_format: Optional[str] = None,
+    language: Optional[str] = None,
+    length: Optional[str] = None,
+    focus_text: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     Thin wrapper to invoke the NotebookLM audio overview creation task.
     Keeping this indirection makes it easier to swap implementations later.
     """
     try:
-        return await create_audio_overview(page, notebook_id)
+        return await create_audio_overview(
+            page, notebook_id, audio_format, language, length, focus_text
+        )
     except NotebookLMError:
         raise
 
