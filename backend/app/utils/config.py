@@ -14,6 +14,9 @@ config = {
         os.environ.get("JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
     ),
     "JWT_ALGORITHM": os.environ.get("JWT_ALGORITHM"),
+    # CELERY
+    "CELERY_RESULT_BACKEND": os.environ.get("CELERY_RESULT_BACKEND"),
+    "CELERY_BROKER_URL": os.environ.get("CELERY_BROKER_URL"),
 }
 
 # Normalize keys to lowercase for easier access (existing behavior)
