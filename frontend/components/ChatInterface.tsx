@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { chatApi } from '@/lib/api-client';
 import type { ChatMessage } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
+import { getTextDirection } from '@/lib/rtl-utils';
 
 interface ChatInterfaceProps {
   notebookId: string;
@@ -22,6 +23,9 @@ export default function ChatInterface({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Detect RTL for the query input
+  const queryRTL = useMemo(() => getTextDirection(query), [query]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,28 +102,34 @@ export default function ChatInterface({
             No messages yet. Start a conversation!
           </div>
         ) : (
-          messages.map((message, idx) => (
-            <div
-              key={idx}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          messages.map((message, idx) => {
+            const messageRTL = getTextDirection(message.content);
+            return (
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
+                key={idx}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className="prose prose-sm max-w-none">
-                  <ReactMarkdown
-                    className={message.role === 'user' ? 'text-white' : 'text-gray-900'}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                  }`}
+                  dir={messageRTL}
+                >
+                  <div className={`prose prose-sm max-w-none ${
+                    message.role === 'user' 
+                      ? 'prose-invert prose-headings:text-white prose-p:text-white prose-strong:text-white prose-ul:text-white prose-ol:text-white prose-li:text-white'
+                      : 'prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900'
+                  }`}>
+                    <ReactMarkdown>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -140,7 +150,8 @@ export default function ChatInterface({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask a question..."
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            dir={queryRTL}
             disabled={sending || loading}
           />
           <button

@@ -147,7 +147,7 @@ export default function ArtifactCreateModal({
               <select
                 value={audioFormat}
                 onChange={(e) => setAudioFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Deep Dive">Deep Dive</option>
@@ -161,7 +161,7 @@ export default function ArtifactCreateModal({
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="english">English</option>
@@ -174,7 +174,7 @@ export default function ArtifactCreateModal({
                 <select
                   value={length}
                   onChange={(e) => setLength(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
                   <option value="">Default</option>
                   <option value="Short">Short</option>
@@ -189,7 +189,7 @@ export default function ArtifactCreateModal({
                 <select
                   value={length}
                   onChange={(e) => setLength(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
                   <option value="">Default</option>
                   <option value="Short">Short</option>
@@ -204,7 +204,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setFocusText(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -218,7 +218,7 @@ export default function ArtifactCreateModal({
               <select
                 value={videoFormat}
                 onChange={(e) => setVideoFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Explainer">Explainer</option>
@@ -230,7 +230,7 @@ export default function ArtifactCreateModal({
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="english">English</option>
@@ -242,7 +242,7 @@ export default function ArtifactCreateModal({
               <select
                 value={visualStyle}
                 onChange={(e) => setVisualStyle(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Auto-select">Auto-select</option>
@@ -268,7 +268,7 @@ export default function ArtifactCreateModal({
                   rows={3}
                   maxLength={5000}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 />
               </div>
             )}
@@ -279,7 +279,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setFocusText(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -293,7 +293,7 @@ export default function ArtifactCreateModal({
               <select
                 value={cardCount}
                 onChange={(e) => setCardCount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Fewer">Fewer</option>
@@ -306,7 +306,7 @@ export default function ArtifactCreateModal({
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Easy">Easy</option>
@@ -321,7 +321,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -335,7 +335,7 @@ export default function ArtifactCreateModal({
               <select
                 value={questionCount}
                 onChange={(e) => setQuestionCount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Fewer">Fewer</option>
@@ -348,7 +348,7 @@ export default function ArtifactCreateModal({
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Easy">Easy</option>
@@ -363,7 +363,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -377,7 +377,7 @@ export default function ArtifactCreateModal({
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="english">English</option>
@@ -389,7 +389,7 @@ export default function ArtifactCreateModal({
               <select
                 value={orientation}
                 onChange={(e) => setOrientation(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Landscape">Landscape</option>
@@ -402,7 +402,7 @@ export default function ArtifactCreateModal({
               <select
                 value={detailLevel}
                 onChange={(e) => setDetailLevel(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Concise">Concise</option>
@@ -417,7 +417,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -431,7 +431,7 @@ export default function ArtifactCreateModal({
               <select
                 value={slideDeckFormat}
                 onChange={(e) => setSlideDeckFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Detailed Deck">Detailed Deck</option>
@@ -443,7 +443,7 @@ export default function ArtifactCreateModal({
               <select
                 value={slideDeckLength}
                 onChange={(e) => setSlideDeckLength(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Short">Short</option>
@@ -455,7 +455,7 @@ export default function ArtifactCreateModal({
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="english">English</option>
@@ -469,7 +469,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -483,7 +483,7 @@ export default function ArtifactCreateModal({
               <select
                 value={reportFormat}
                 onChange={(e) => setReportFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="Create Your Own">Create Your Own</option>
@@ -497,7 +497,7 @@ export default function ArtifactCreateModal({
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
                 <option value="">Default</option>
                 <option value="english">English</option>
@@ -511,7 +511,7 @@ export default function ArtifactCreateModal({
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={5000}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>

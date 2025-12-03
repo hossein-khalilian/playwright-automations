@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { sourceApi } from '@/lib/api-client';
 import ReactMarkdown from 'react-markdown';
+import { getRTLClasses, getTextDirection } from '@/lib/rtl-utils';
 
 interface SourceReviewModalProps {
   notebookId: string;
@@ -18,6 +19,18 @@ export default function SourceReviewModal({
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
+
+  // Detect RTL for the content
+  const contentRTL = useMemo(() => {
+    if (!data) return null;
+    const allText = [
+      data.title,
+      data.summary,
+      data.content,
+      ...(data.key_topics || []),
+    ].filter(Boolean).join(' ');
+    return getTextDirection(allText);
+  }, [data]);
 
   useEffect(() => {
     const loadReview = async () => {
@@ -69,18 +82,29 @@ export default function SourceReviewModal({
                 <div className="text-sm text-red-800">{error}</div>
               </div>
             ) : data ? (
-              <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+              <div 
+                className="space-y-4 max-h-[70vh] overflow-y-auto"
+                dir={contentRTL || 'ltr'}
+              >
                 {data.title && (
                   <div>
                     <h4 className="font-semibold text-gray-900">Title</h4>
-                    <p className="text-gray-700">{data.title}</p>
+                    <p 
+                      className="text-gray-700"
+                      dir={getTextDirection(data.title)}
+                    >
+                      {data.title}
+                    </p>
                   </div>
                 )}
 
                 {data.summary && (
                   <div>
                     <h4 className="font-semibold text-gray-900">Summary</h4>
-                    <div className="prose max-w-none">
+                    <div 
+                      className="prose max-w-none prose-gray prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900"
+                      dir={getTextDirection(data.summary)}
+                    >
                       <ReactMarkdown>{data.summary}</ReactMarkdown>
                     </div>
                   </div>
@@ -89,10 +113,19 @@ export default function SourceReviewModal({
                 {data.key_topics && data.key_topics.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-gray-900">Key Topics</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {data.key_topics.map((topic: string, idx: number) => (
-                        <li key={idx} className="text-gray-700">{topic}</li>
-                      ))}
+                    <ul className={`list-disc space-y-1 ${contentRTL === 'rtl' ? 'list-inside pr-6' : 'list-inside pl-6'}`}>
+                      {data.key_topics.map((topic: string, idx: number) => {
+                        const topicRTL = getTextDirection(topic);
+                        return (
+                          <li 
+                            key={idx} 
+                            className="text-gray-700"
+                            dir={topicRTL}
+                          >
+                            {topic}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -100,7 +133,10 @@ export default function SourceReviewModal({
                 {data.content && (
                   <div>
                     <h4 className="font-semibold text-gray-900">Content</h4>
-                    <div className="prose max-w-none">
+                    <div 
+                      className="prose max-w-none prose-gray prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900"
+                      dir={getTextDirection(data.content)}
+                    >
                       <ReactMarkdown>{data.content}</ReactMarkdown>
                     </div>
                   </div>

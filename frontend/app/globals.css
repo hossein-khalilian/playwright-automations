@@ -26,3 +26,179 @@ body {
   }
 }
 
+/* Ensure text visibility in prose sections */
+.prose {
+  color: #111827; /* text-gray-900 */
+}
+
+.prose p {
+  color: #111827;
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: #111827;
+  font-weight: 600;
+  margin-top: 2em;
+  margin-bottom: 1em;
+}
+
+.prose strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.prose ul,
+.prose ol {
+  color: #111827;
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+  padding-left: 1.625em;
+}
+
+.prose li {
+  color: #111827;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose code {
+  color: #111827;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.prose pre {
+  color: #111827;
+  background-color: #f3f4f6;
+  padding: 1em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.prose blockquote {
+  color: #374151;
+  border-left-color: #e5e7eb;
+  border-left-width: 0.25rem;
+  padding-left: 1em;
+}
+
+.prose a {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+/* RTL support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+[dir="rtl"] .prose ul,
+[dir="rtl"] .prose ol {
+  padding-right: 1.625em;
+  padding-left: 0;
+}
+
+[dir="rtl"] .prose blockquote {
+  border-right-color: #e5e7eb;
+  border-right-width: 0.25rem;
+  border-left-width: 0;
+  padding-right: 1em;
+  padding-left: 0;
+}
+
+/* Invert prose colors for dark backgrounds (like user messages) */
+.prose-invert {
+  color: #ffffff;
+}
+
+.prose-invert p,
+.prose-invert h1,
+.prose-invert h2,
+.prose-invert h3,
+.prose-invert h4,
+.prose-invert h5,
+.prose-invert h6,
+.prose-invert strong,
+.prose-invert ul,
+.prose-invert ol,
+.prose-invert li {
+  color: #ffffff;
+}
+
+.prose-invert code {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.prose-invert pre {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose-invert blockquote {
+  color: #e5e7eb;
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+.prose-invert a {
+  color: #93c5fd;
+}
+
+[dir="rtl"] .prose-invert blockquote {
+  border-right-color: rgba(255, 255, 255, 0.3);
+  border-left-width: 0;
+}
+
+/* Ensure input text is visible */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  color: #111827;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}
+
+/* Ensure select dropdown text is visible */
+select {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+select option {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+/* Ensure select dropdown is visible when focused */
+select:focus {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+/* Ensure select dropdown options are visible in dropdown menu */
+select option:checked,
+select option[selected] {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+/* Ensure options are visible when hovered */
+select option:hover {
+  background-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
