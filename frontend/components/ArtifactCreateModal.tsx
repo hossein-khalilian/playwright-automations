@@ -10,6 +10,7 @@ import type {
   InfographicCreateRequest,
   SlideDeckCreateRequest,
   ReportCreateRequest,
+  MindmapCreateRequest,
 } from '@/lib/types';
 
 interface ArtifactCreateModalProps {
@@ -118,6 +119,11 @@ export default function ArtifactCreateModal({
             description: description || undefined,
           };
           await artifactApi.createReport(notebookId, data);
+          break;
+        }
+        case 'mindmap': {
+          const data: MindmapCreateRequest = {};
+          await artifactApi.createMindmap(notebookId, data);
           break;
         }
       }
@@ -511,6 +517,13 @@ export default function ArtifactCreateModal({
           </>
         );
 
+      case 'mindmap':
+        return (
+          <div className="text-sm text-gray-600">
+            Click &quot;Create&quot; to generate a mind map for this notebook. No additional configuration is required.
+          </div>
+        );
+
       default:
         return null;
     }
@@ -525,6 +538,7 @@ export default function ArtifactCreateModal({
       infographic: 'Create Infographic',
       'slide-deck': 'Create Slide Deck',
       report: 'Create Report',
+      mindmap: 'Create Mind Map',
     };
     return titles[artifactType] || 'Create Artifact';
   };

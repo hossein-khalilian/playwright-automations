@@ -29,6 +29,8 @@ import type {
   SlideDeckCreateResponse,
   ReportCreateRequest,
   ReportCreateResponse,
+  MindmapCreateRequest,
+  MindmapCreateResponse,
   GoogleLoginStatusResponse,
 } from './types';
 
@@ -277,6 +279,17 @@ export const artifactApi = {
   ): Promise<ReportCreateResponse> => {
     const response = await api.post<ReportCreateResponse>(
       `/notebooklm/notebooks/${notebookId}/report`,
+      data
+    );
+    return response.data;
+  },
+
+  createMindmap: async (
+    notebookId: string,
+    data: MindmapCreateRequest
+  ): Promise<MindmapCreateResponse> => {
+    const response = await api.post<MindmapCreateResponse>(
+      `/notebooklm/notebooks/${notebookId}/mindmap`,
       data
     );
     return response.data;

@@ -20,23 +20,22 @@ export default function SourceReviewModal({
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const loadReview = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const response = await sourceApi.review(notebookId, sourceName);
+        setData(response);
+      } catch (err: any) {
+        const errorMessage = err.response?.data?.detail || err.message || 'Failed to load source review';
+        setError(errorMessage);
+        console.error('Review error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
     loadReview();
   }, [notebookId, sourceName]);
-
-  const loadReview = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const response = await sourceApi.review(notebookId, sourceName);
-      setData(response);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load source review';
-      setError(errorMessage);
-      console.error('Review error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">

@@ -85,6 +85,7 @@ export default function ArtifactManager({
     { id: 'infographic', label: 'Infographic' },
     { id: 'slide-deck', label: 'Slide Deck' },
     { id: 'report', label: 'Report' },
+    { id: 'mindmap', label: 'Mind Map' },
   ];
 
   return (

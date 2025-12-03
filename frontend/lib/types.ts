@@ -66,6 +66,10 @@ export interface SourceReviewResponse {
   }>;
 }
 
+export interface SourceRenameRequest {
+  new_name: string;
+}
+
 // Chat types
 export interface ChatMessage {
   role: string;
@@ -219,6 +223,16 @@ export interface ReportCreateRequest {
 }
 
 export interface ReportCreateResponse {
+  status: string;
+  message: string;
+}
+
+// Mindmap types
+export interface MindmapCreateRequest {
+  // No optional parameters for mindmap
+}
+
+export interface MindmapCreateResponse {
   status: string;
   message: string;
 }
