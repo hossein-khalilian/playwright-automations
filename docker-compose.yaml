@@ -20,38 +20,49 @@ services:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
 
-  # redis:
-  #   image: redis:7-alpine
-  #   networks:
-  #     - shared_net
-  #
-  # worker:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   env_file:
-  #     - .env
-  #   command:
-  #     [
-  #       "celery",
-  #       "-A",
-  #       "app.worker.celery_app",
-  #       "worker",
-  #       "--loglevel=info",
-  #       "--concurrency=1",
-  #     ]
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - shared_net
-  #   volumes:
-  #     - ./backend:/app
-  #     - shared_tmp:/tmp
-  #
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "--loglevel=info",
+        "--concurrency=1",
+      ]
+    networks:
+      - shared_net
+    volumes:
+      - ./backend:/app
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: >
+      celery -A app.worker.celery_app flower
+             --port=5555
+    ports:
+      - "${FLOWER_PORT}:5555"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - shared_net
+    depends_on:
+      - worker
+
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     env_file:
       - .env
     ports:
@@ -59,7 +70,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/.next
     environment:
       - NODE_ENV=development
     command: ["npm", "run", "dev"]
