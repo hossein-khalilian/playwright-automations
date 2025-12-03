@@ -48,22 +48,25 @@ services:
   #     - ./backend:/app
   #     - shared_tmp:/tmp
   #
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "3000:3000"
-  #   volumes:
-  #     - ./frontend:/app
-  #     - /app/node_modules
-  #   environment:
-  #     - NODE_ENV=development
-  #   command: ["npm", "run", "dev"]
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - backend
+    networks:
+      - shared_net
 
 networks:
   shared_net:
