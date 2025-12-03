@@ -15,6 +15,7 @@ from app.utils.browser_state import (
 from app.utils.browser_utils import initialize_page
 from app.utils.db import close_db_client
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -85,6 +86,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(api_router)
 
 
