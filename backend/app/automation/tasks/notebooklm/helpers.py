@@ -12,6 +12,7 @@ from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 async def navigate_to_notebook(page: Page, notebook_id: str) -> None:
     """
     Navigate to a specific notebook page.
+    Only navigates if not already on the correct notebook page.
 
     Args:
         page: The Playwright Page object
@@ -21,12 +22,21 @@ async def navigate_to_notebook(page: Page, notebook_id: str) -> None:
         NotebookLMError: If navigation fails
     """
     try:
-        await page.goto(
-            f"https://notebooklm.google.com/notebook/{notebook_id}",
-            wait_until="domcontentloaded",
-            timeout=30_000,
-        )
-        await page.wait_for_timeout(1_000)
+        # Check if we're already on the correct notebook page
+        current_notebook_id = await extract_notebook_id_from_url(page)
+        target_url = f"https://notebooklm.google.com/notebook/{notebook_id}"
+        
+        # Only navigate if we're not already on the correct notebook
+        if current_notebook_id != notebook_id or not page.url.startswith(target_url):
+            await page.goto(
+                target_url,
+                wait_until="domcontentloaded",
+                timeout=30_000,
+            )
+            await page.wait_for_timeout(1_000)
+        else:
+            # We're already on the correct page, just wait a bit for stability
+            await page.wait_for_timeout(500)
     except Exception as exc:
         raise NotebookLMError(f"Failed to navigate to notebook {notebook_id}: {exc}") from exc
 
