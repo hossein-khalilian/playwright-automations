@@ -418,6 +418,15 @@ class ReportCreateResponse(BaseModel):
     message: str = Field(description="Message describing the result")
 
 
+class MindmapCreateRequest(BaseModel):
+    """Request model for mind map creation. Currently no optional parameters."""
+
+
+class MindmapCreateResponse(BaseModel):
+    status: str = Field(description="Status of the mind map creation")
+    message: str = Field(description="Message describing the result")
+
+
 class ArtifactInfo(BaseModel):
     type: Optional[str] = Field(
         None,

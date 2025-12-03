@@ -42,6 +42,8 @@ from app.models import (
     SlideDeckCreateResponse,
     ReportCreateRequest,
     ReportCreateResponse,
+    MindmapCreateRequest,
+    MindmapCreateResponse,
 )
 from app.utils.browser_state import get_browser_page
 from app.utils.db import delete_notebook_from_db, get_notebooks_by_user, save_notebook
@@ -59,6 +61,7 @@ from app.utils.notebooklm import (
     trigger_infographic_creation,
     trigger_slide_deck_creation,
     trigger_report_creation,
+    trigger_mindmap_creation,
     trigger_notebook_deletion,
     trigger_notebook_query,
     trigger_source_deletion,
@@ -1243,6 +1246,68 @@ async def create_report_endpoint(
         ) from exc
 
     return ReportCreateResponse(
+        status=result["status"],
+        message=result["message"],
+    )
+
+
+@router.post(
+    "/notebooks/{notebook_id}/mindmap",
+    response_model=MindmapCreateResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Artifacts"],
+)
+async def create_mindmap_endpoint(
+    notebook_id: str,
+    request: MindmapCreateRequest,
+    current_user: CurrentUser,
+) -> MindmapCreateResponse:
+    """
+    Create a mind map for a notebook.
+    """
+    page = get_browser_page()
+    if page is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Browser page not initialized. Please check server logs.",
+        )
+
+    # Ensure we have an async page (should always be the case with async initialization)
+    if not isinstance(page, Page):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Browser page type mismatch. Expected async page.",
+        )
+
+    # Verify the notebook belongs to the current user
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebook_exists = any(
+        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    )
+
+    if not notebook_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Notebook {notebook_id} not found for the current user.",
+        )
+
+    try:
+        result = await trigger_mindmap_creation(
+            page,
+            notebook_id,
+        )
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while creating mind map.",
+        ) from exc
+
+    return MindmapCreateResponse(
         status=result["status"],
         message=result["message"],
     )

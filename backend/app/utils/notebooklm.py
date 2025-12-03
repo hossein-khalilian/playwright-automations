@@ -25,6 +25,7 @@ from app.automation.tasks.notebooklm.sources import (
 )
 from app.automation.tasks.notebooklm.flashcards import create_flashcards
 from app.automation.tasks.notebooklm.infographic import create_infographic
+from app.automation.tasks.notebooklm.mindmap import create_mindmap
 from app.automation.tasks.notebooklm.quiz import create_quiz
 from app.automation.tasks.notebooklm.report import create_report
 from app.automation.tasks.notebooklm.slide_deck import create_slide_deck
@@ -285,6 +286,20 @@ async def trigger_report_creation(
     """
     try:
         return await create_report(page, notebook_id, format, language, description)
+    except NotebookLMError:
+        raise
+
+
+async def trigger_mindmap_creation(
+    page: Page,
+    notebook_id: str,
+) -> Dict[str, str]:
+    """
+    Thin wrapper to invoke the NotebookLM mind map creation task.
+    Keeping this indirection makes it easier to swap implementations later.
+    """
+    try:
+        return await create_mindmap(page, notebook_id)
     except NotebookLMError:
         raise
 
