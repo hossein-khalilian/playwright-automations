@@ -17,6 +17,11 @@ config = {
     # CELERY
     "CELERY_RESULT_BACKEND": os.environ.get("CELERY_RESULT_BACKEND"),
     "CELERY_BROKER_URL": os.environ.get("CELERY_BROKER_URL"),
+    # minio
+    "MINIO_ENDPOINT": os.environ.get("MINIO_ENDPOINT"),
+    "MINIO_ROOT_USER": os.environ.get("MINIO_ROOT_USER"),
+    "MINIO_ROOT_PASSWORD": os.environ.get("MINIO_ROOT_PASSWORD"),
+    "MINIO_AUDIO_BUCKET": os.environ.get("MINIO_AUDIO_BUCKET"),
 }
 
 # Normalize keys to lowercase for easier access (existing behavior)
