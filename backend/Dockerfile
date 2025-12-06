@@ -25,10 +25,12 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
 
 # Install Playwright system dependencies and browsers
-RUN playwright install-deps chromium && \
+RUN --mount=type=cache,target=/ms-playwright \
+    playwright install-deps chromium && \
     playwright install chromium
 
 COPY . .
