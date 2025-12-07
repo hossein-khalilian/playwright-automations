@@ -4,8 +4,7 @@ These are best-effort ports of the async flows, focused on parity for core actio
 """
 
 import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError

@@ -13,6 +13,8 @@ from app.models import (
     FlashcardCreateRequest,
     InfographicCreateRequest,
     MindmapCreateRequest,
+    Notebook,
+    NotebookListResponse,
     NotebookQueryRequest,
     QuizCreateRequest,
     ReportCreateRequest,
@@ -46,6 +48,7 @@ from app.tasks.notebooklm import (
     rename_source_task,
     review_source_task,
 )
+from app.utils.db import get_notebooks_by_user
 
 router = APIRouter(prefix="/notebooklm")
 
@@ -89,6 +92,30 @@ def _task_status(task_id: str) -> TaskStatusResponse:
 # ============================================================================
 # Notebooks
 # ============================================================================
+
+@router.get(
+    "/notebooks",
+    response_model=NotebookListResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Notebooks"],
+)
+async def list_notebooks_endpoint(
+    current_user: CurrentUser
+) -> NotebookListResponse:
+    """
+    List all notebooks for the current user.
+    Returns notebooks directly from MongoDB without using Celery.
+    """
+    notebooks_data = await get_notebooks_by_user(current_user.username)
+    notebooks = [
+        Notebook(
+            notebook_id=doc["notebook_id"],
+            notebook_url=doc["notebook_url"],
+            created_at=doc["created_at"],
+        )
+        for doc in notebooks_data
+    ]
+    return NotebookListResponse(notebooks=notebooks)
 
 
 @router.post(
