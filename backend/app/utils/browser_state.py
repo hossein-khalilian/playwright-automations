@@ -5,7 +5,7 @@ Stores the initialized browser page, context, and playwright instance.
 
 from typing import Optional
 
-from playwright.async_api import BrowserContext, Page, Playwright
+from playwright.sync_api import BrowserContext, Page, Playwright
 
 # Global state to store browser resources
 browser_state: dict[str, Optional[Page | BrowserContext | Playwright]] = {

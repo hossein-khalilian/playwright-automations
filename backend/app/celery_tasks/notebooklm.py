@@ -56,10 +56,26 @@ def _run_with_browser(
         release_browser(resource)
 
 
-def _threaded(fn, *args, **kwargs) -> Dict[str, Any]:
+def _run_in_sync_thread(fn, *args, **kwargs) -> Dict[str, Any]:
+    """
+    Run sync Playwright code in a thread without an asyncio event loop.
+    Celery may run in an asyncio context even with solo pool, so we need
+    to ensure Playwright sync API runs in a clean thread.
+    """
     def _call():
-        # Ensure Playwright sync API sees no running asyncio loop in this thread
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        # Ensure this thread has no asyncio event loop
+        # ThreadPoolExecutor creates a new thread, but we need to ensure
+        # it doesn't have an event loop for Playwright sync API to work
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop.is_closed():
+                loop.close()
+        except RuntimeError:
+            # No event loop exists - this is what we want
+            pass
+        
+        # Explicitly set event loop to None to ensure Playwright sync API works
+        asyncio.set_event_loop(None)
         return fn(*args, **kwargs)
 
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -72,16 +88,14 @@ def _threaded(fn, *args, **kwargs) -> Dict[str, Any]:
 
 @celery_app.task(name="notebooklm.create_notebook")
 def create_notebook_task(headless: bool, user_profile_name: str) -> Dict[str, Any]:
-    return _threaded(_run_with_browser, headless, user_profile_name, create_notebook)
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, create_notebook)
 
 
 @celery_app.task(name="notebooklm.delete_notebook")
 def delete_notebook_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser, headless, user_profile_name, delete_notebook, notebook_id
-    )
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, delete_notebook, notebook_id)
 
 
 # -------- Sources --------
@@ -91,22 +105,15 @@ def delete_notebook_task(
 def list_sources_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser, headless, user_profile_name, list_sources, notebook_id
-    )
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, list_sources, notebook_id)
 
 
 @celery_app.task(name="notebooklm.add_source")
 def add_source_task(
     notebook_id: str, file_path: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        add_source_to_notebook,
-        notebook_id,
-        file_path,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, add_source_to_notebook, notebook_id, file_path
     )
 
 
@@ -114,13 +121,8 @@ def add_source_task(
 def delete_source_task(
     notebook_id: str, source_name: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        delete_source,
-        notebook_id,
-        source_name,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, delete_source, notebook_id, source_name
     )
 
 
@@ -132,14 +134,8 @@ def rename_source_task(
     headless: bool,
     user_profile_name: str,
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        rename_source,
-        notebook_id,
-        source_name,
-        new_name,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, rename_source, notebook_id, source_name, new_name
     )
 
 
@@ -147,13 +143,8 @@ def rename_source_task(
 def review_source_task(
     notebook_id: str, source_name: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        review_source,
-        notebook_id,
-        source_name,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, review_source, notebook_id, source_name
     )
 
 
@@ -164,13 +155,8 @@ def review_source_task(
 def query_notebook_task(
     notebook_id: str, query: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        query_notebook,
-        notebook_id,
-        query,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, query_notebook, notebook_id, query
     )
 
 
@@ -178,16 +164,14 @@ def query_notebook_task(
 def get_chat_history_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser, headless, user_profile_name, get_chat_history, notebook_id
-    )
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, get_chat_history, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_chat_history")
 def delete_chat_history_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser, headless, user_profile_name, delete_chat_history, notebook_id
     )
 
@@ -199,22 +183,15 @@ def delete_chat_history_task(
 def list_artifacts_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser, headless, user_profile_name, list_artifacts, notebook_id
-    )
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, list_artifacts, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_artifact")
 def delete_artifact_task(
     notebook_id: str, artifact_name: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        delete_artifact,
-        notebook_id,
-        artifact_name,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, delete_artifact, notebook_id, artifact_name
     )
 
 
@@ -226,7 +203,7 @@ def rename_artifact_task(
     headless: bool,
     user_profile_name: str,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -241,13 +218,8 @@ def rename_artifact_task(
 def download_artifact_task(
     notebook_id: str, artifact_name: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        download_artifact,
-        notebook_id,
-        artifact_name,
+    return _run_in_sync_thread(
+        _run_with_browser, headless, user_profile_name, download_artifact, notebook_id, artifact_name
     )
 
 
@@ -264,7 +236,7 @@ def create_audio_overview_task(
     length: str | None = None,
     focus_text: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -288,7 +260,7 @@ def create_video_overview_task(
     custom_style_description: str | None = None,
     focus_text: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -311,7 +283,7 @@ def create_flashcards_task(
     difficulty: str | None = None,
     topic: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -332,7 +304,7 @@ def create_quiz_task(
     difficulty: str | None = None,
     topic: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -354,7 +326,7 @@ def create_infographic_task(
     detail_level: str | None = None,
     description: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -377,7 +349,7 @@ def create_slide_deck_task(
     language: str | None = None,
     description: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -399,7 +371,7 @@ def create_report_task(
     language: str | None = None,
     description: str | None = None,
 ) -> Dict[str, Any]:
-    return _threaded(
+    return _run_in_sync_thread(
         _run_with_browser,
         headless,
         user_profile_name,
@@ -415,6 +387,4 @@ def create_report_task(
 def create_mindmap_task(
     notebook_id: str, headless: bool, user_profile_name: str
 ) -> Dict[str, Any]:
-    return _threaded(
-        _run_with_browser, headless, user_profile_name, create_mindmap, notebook_id
-    )
+    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, create_mindmap, notebook_id)

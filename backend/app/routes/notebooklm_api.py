@@ -24,7 +24,7 @@ from app.models import (
     TaskSubmissionResponse,
     VideoOverviewCreateRequest,
 )
-from app.tasks.notebooklm import (
+from app.celery_tasks.notebooklm import (
     add_source_task,
     create_audio_overview_task,
     create_flashcards_task,
@@ -124,7 +124,7 @@ async def list_notebooks_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Notebooks"],
 )
-async def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
+def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
     return _submit(create_notebook_task, _headless(), _profile())
 
 
@@ -134,7 +134,7 @@ async def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionR
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Notebooks"],
 )
-async def delete_notebook_endpoint(
+def delete_notebook_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(delete_notebook_task, notebook_id, _headless(), _profile())
@@ -151,7 +151,7 @@ async def delete_notebook_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Sources"],
 )
-async def list_sources_endpoint(
+def list_sources_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(list_sources_task, notebook_id, _headless(), _profile())
@@ -163,13 +163,13 @@ async def list_sources_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Sources"],
 )
-async def upload_source_endpoint(
+def upload_source_endpoint(
     notebook_id: str, file: UploadFile = File(...), current_user: CurrentUser = None
 ) -> TaskSubmissionResponse:
     try:
         suffix = Path(file.filename).suffix if file.filename else ".bin"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
+            content = file.file.read()
             tmp.write(content)
             tmp_path = tmp.name
     except Exception as exc:
@@ -186,7 +186,7 @@ async def upload_source_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Sources"],
 )
-async def delete_source_endpoint(
+def delete_source_endpoint(
     notebook_id: str, source_name: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(
@@ -200,7 +200,7 @@ async def delete_source_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Sources"],
 )
-async def rename_source_endpoint(
+def rename_source_endpoint(
     notebook_id: str,
     source_name: str,
     payload: SourceRenameRequest,
@@ -222,7 +222,7 @@ async def rename_source_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Sources"],
 )
-async def review_source_endpoint(
+def review_source_endpoint(
     notebook_id: str, source_name: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(
@@ -239,7 +239,7 @@ async def review_source_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Chat"],
 )
-async def chat_history_endpoint(
+def chat_history_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(get_chat_history_task, notebook_id, _headless(), _profile())
@@ -251,7 +251,7 @@ async def chat_history_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Chat"],
 )
-async def query_notebook_endpoint(
+def query_notebook_endpoint(
     notebook_id: str, payload: NotebookQueryRequest, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(
@@ -265,7 +265,7 @@ async def query_notebook_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Chat"],
 )
-async def delete_chat_history_endpoint(
+def delete_chat_history_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(delete_chat_history_task, notebook_id, _headless(), _profile())
@@ -282,7 +282,7 @@ async def delete_chat_history_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Management"],
 )
-async def list_artifacts_endpoint(
+def list_artifacts_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(list_artifacts_task, notebook_id, _headless(), _profile())
@@ -294,7 +294,7 @@ async def list_artifacts_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Management"],
 )
-async def delete_artifact_endpoint(
+def delete_artifact_endpoint(
     notebook_id: str, artifact_name: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(
@@ -308,7 +308,7 @@ async def delete_artifact_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Management"],
 )
-async def rename_artifact_endpoint(
+def rename_artifact_endpoint(
     notebook_id: str,
     artifact_name: str,
     payload: ArtifactRenameRequest,
@@ -330,7 +330,7 @@ async def rename_artifact_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Management"],
 )
-async def download_artifact_endpoint(
+def download_artifact_endpoint(
     notebook_id: str, artifact_name: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(
@@ -349,7 +349,7 @@ async def download_artifact_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_audio_overview_endpoint(
+def create_audio_overview_endpoint(
     notebook_id: str,
     payload: AudioOverviewCreateRequest,
     current_user: CurrentUser,
@@ -372,7 +372,7 @@ async def create_audio_overview_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_video_overview_endpoint(
+def create_video_overview_endpoint(
     notebook_id: str,
     payload: VideoOverviewCreateRequest,
     current_user: CurrentUser,
@@ -396,7 +396,7 @@ async def create_video_overview_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_flashcards_endpoint(
+def create_flashcards_endpoint(
     notebook_id: str,
     payload: FlashcardCreateRequest,
     current_user: CurrentUser,
@@ -418,7 +418,7 @@ async def create_flashcards_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_quiz_endpoint(
+def create_quiz_endpoint(
     notebook_id: str,
     payload: QuizCreateRequest,
     current_user: CurrentUser,
@@ -440,7 +440,7 @@ async def create_quiz_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_infographic_endpoint(
+def create_infographic_endpoint(
     notebook_id: str,
     payload: InfographicCreateRequest,
     current_user: CurrentUser,
@@ -463,7 +463,7 @@ async def create_infographic_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_slide_deck_endpoint(
+def create_slide_deck_endpoint(
     notebook_id: str,
     payload: SlideDeckCreateRequest,
     current_user: CurrentUser,
@@ -486,7 +486,7 @@ async def create_slide_deck_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_report_endpoint(
+def create_report_endpoint(
     notebook_id: str,
     payload: ReportCreateRequest,
     current_user: CurrentUser,
@@ -508,7 +508,7 @@ async def create_report_endpoint(
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Creation"],
 )
-async def create_mindmap_endpoint(
+def create_mindmap_endpoint(
     notebook_id: str, payload: MindmapCreateRequest, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
     return _submit(create_mindmap_task, notebook_id, _headless(), _profile())
@@ -525,5 +525,5 @@ async def create_mindmap_endpoint(
     status_code=status.HTTP_200_OK,
     tags=["Tasks"],
 )
-async def task_status(task_id: str) -> TaskStatusResponse:
+def task_status(task_id: str) -> TaskStatusResponse:
     return _task_status(task_id)

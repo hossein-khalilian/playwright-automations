@@ -1,9 +1,7 @@
-import asyncio
 import os
 import random
 import re
 import time
-from pathlib import Path
 from typing import Tuple
 
 from dotenv import load_dotenv
