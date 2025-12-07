@@ -19,8 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
-api_router.include_router(notebooklm_router)
 api_router.include_router(google_router)
+api_router.include_router(notebooklm_router)
 
 
 @asynccontextmanager

@@ -76,6 +76,20 @@ class SourceListResponse(BaseModel):
     sources: List[Source] = Field(description="List of sources in the notebook")
 
 
+class TaskSubmissionResponse(BaseModel):
+    task_id: str = Field(description="Celery task identifier")
+    status: str = Field(description="Status of the task submission")
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str = Field(description="Celery task identifier")
+    state: str = Field(description="Celery task state (e.g. PENDING, SUCCESS)")
+    status: str = Field(description="High-level task status (pending/success/failure)")
+    message: Optional[str] = Field(
+        None, description="Additional detail about the current task state"
+    )
+
+
 class SourceRenameRequest(BaseModel):
     new_name: str = Field(description="The new name for the source")
 
