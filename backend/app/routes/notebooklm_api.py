@@ -2,1590 +2,450 @@ import os
 import tempfile
 from pathlib import Path
 
+from celery.result import AsyncResult
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
-from playwright.async_api import Page
 
 from app.auth import CurrentUser
-from app.automation.tasks.notebooklm.exceptions import NotebookLMError
+from app.celery_app import celery_app
 from app.models import (
-    ArtifactDeleteResponse,
-    ArtifactInfo,
-    ArtifactListResponse,
     ArtifactRenameRequest,
-    ArtifactRenameResponse,
     AudioOverviewCreateRequest,
-    AudioOverviewCreateResponse,
-    ChatHistoryResponse,
-    ChatMessage,
     FlashcardCreateRequest,
-    FlashcardCreateResponse,
-    Notebook,
-    NotebookCreateResponse,
-    NotebookListResponse,
-    NotebookQueryRequest,
-    NotebookQueryResponse,
-    Source,
-    SourceImageInfo,
-    SourceListResponse,
-    SourceRenameRequest,
-    SourceRenameResponse,
-    SourceReviewResponse,
-    SourceUploadResponse,
-    VideoOverviewCreateRequest,
-    VideoOverviewCreateResponse,
-    QuizCreateRequest,
-    QuizCreateResponse,
     InfographicCreateRequest,
-    InfographicCreateResponse,
-    SlideDeckCreateRequest,
-    SlideDeckCreateResponse,
-    ReportCreateRequest,
-    ReportCreateResponse,
     MindmapCreateRequest,
-    MindmapCreateResponse,
+    NotebookQueryRequest,
+    QuizCreateRequest,
+    ReportCreateRequest,
+    SlideDeckCreateRequest,
+    SourceRenameRequest,
+    TaskStatusResponse,
+    TaskSubmissionResponse,
+    VideoOverviewCreateRequest,
 )
-from app.utils.browser_state import get_browser_page
-from app.utils.db import delete_notebook_from_db, get_notebooks_by_user, save_notebook
-from app.utils.notebooklm import (
-    trigger_artifact_deletion,
-    trigger_artifact_download,
-    trigger_artifact_listing,
-    trigger_artifact_rename,
-    trigger_audio_overview_creation,
-    trigger_chat_history,
-    trigger_chat_history_deletion,
-    trigger_flashcard_creation,
-    trigger_notebook_creation,
-    trigger_quiz_creation,
-    trigger_infographic_creation,
-    trigger_slide_deck_creation,
-    trigger_report_creation,
-    trigger_mindmap_creation,
-    trigger_notebook_deletion,
-    trigger_notebook_query,
-    trigger_source_deletion,
-    trigger_source_listing,
-    trigger_source_rename,
-    trigger_source_review,
-    trigger_source_upload,
-    trigger_video_overview_creation,
+from app.tasks.notebooklm import (
+    add_source_task,
+    create_audio_overview_task,
+    create_flashcards_task,
+    create_infographic_task,
+    create_mindmap_task,
+    create_notebook_task,
+    create_quiz_task,
+    create_report_task,
+    create_slide_deck_task,
+    create_video_overview_task,
+    delete_artifact_task,
+    delete_chat_history_task,
+    delete_notebook_task,
+    delete_source_task,
+    download_artifact_task,
+    get_chat_history_task,
+    list_artifacts_task,
+    list_sources_task,
+    query_notebook_task,
+    rename_artifact_task,
+    rename_source_task,
+    review_source_task,
 )
 
-router = APIRouter(prefix="/notebooklm")
+router = APIRouter(prefix="/notebooklm", tags=["NotebookLM"])
+
+
+def _headless() -> bool:
+    return os.getenv("HEADLESS", "true").lower() == "true"
+
+
+def _profile() -> str:
+    return os.getenv("USER_PROFILE_NAME", "default")
+
+
+def _submit(task_fn, *args, **kwargs) -> TaskSubmissionResponse:
+    task = task_fn.delay(*args, **kwargs)
+    return TaskSubmissionResponse(task_id=task.id, status="submitted")
+
+
+def _task_status(task_id: str) -> TaskStatusResponse:
+    res = AsyncResult(task_id, app=celery_app)
+    state = res.state
+    status_txt = "pending"
+    message = None
+    if state == "SUCCESS":
+        status_txt = "success"
+        result = res.result
+        if isinstance(result, dict) and "message" in result:
+            message = result.get("message")
+        else:
+            message = str(result)
+    elif state in {"FAILURE", "REVOKED"}:
+        status_txt = "failure"
+        try:
+            message = str(res.result)
+        except Exception:
+            message = None
+    return TaskStatusResponse(
+        task_id=task_id, state=state, status=status_txt, message=message
+    )
 
 
 @router.post(
     "/notebooks",
-    response_model=NotebookCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    tags=["Notebooks"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
-async def create_notebook_endpoint(current_user: CurrentUser) -> NotebookCreateResponse:
-    """
-    Create a new notebook in NotebookLM using the browser page from app state.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    try:
-        result = await trigger_notebook_creation(page)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating a NotebookLM notebook.",
-        ) from exc
-
-    # Save notebook to MongoDB if we have a notebook_id and URL
-    notebook_id = result.get("notebook_id")
-    notebook_url = result.get("page_url")
-    if notebook_id and notebook_url:
-        await save_notebook(
-            username=current_user.username,
-            notebook_id=notebook_id,
-            notebook_url=notebook_url,
-        )
-
-    return NotebookCreateResponse(
-        status=result["status"],
-        message=result["message"],
-        notebook_url=notebook_url,
-    )
-
-
-@router.get(
-    "/notebooks",
-    response_model=NotebookListResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Notebooks"],
-)
-async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResponse:
-    """
-    List all notebooks for the current user.
-    """
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-
-    notebooks = [
-        Notebook(
-            notebook_id=notebook["notebook_id"],
-            notebook_url=notebook["notebook_url"],
-            created_at=notebook["created_at"],
-        )
-        for notebook in notebooks_data
-    ]
-
-    return NotebookListResponse(notebooks=notebooks)
+async def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
+    return _submit(create_notebook_task, _headless(), _profile())
 
 
 @router.delete(
     "/notebooks/{notebook_id}",
-    status_code=status.HTTP_200_OK,
-    tags=["Notebooks"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def delete_notebook_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> dict:
-    """
-    Delete a notebook in NotebookLM by its ID.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_notebook_deletion(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting a NotebookLM notebook.",
-        ) from exc
-
-    # Delete notebook from MongoDB
-    await delete_notebook_from_db(
-        username=current_user.username,
-        notebook_id=notebook_id,
-    )
-
-    return {
-        "status": result["status"],
-        "message": result["message"],
-    }
-
-
-@router.post(
-    "/notebooks/{notebook_id}/sources",
-    response_model=SourceUploadResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Sources"],
-)
-async def add_source_to_notebook_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-    file: UploadFile = File(...),
-) -> SourceUploadResponse:
-    """
-    Add a source file to a notebook in NotebookLM.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    # Save uploaded file to a temporary location
-    temp_file_path = None
-    try:
-        # Create a temporary file with the same extension as the uploaded file
-        file_extension = Path(file.filename).suffix if file.filename else ""
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=file_extension
-        ) as temp_file:
-            # Read the uploaded file content and write to temp file
-            content = await file.read()
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-
-        try:
-            result = await trigger_source_upload(page, notebook_id, temp_file_path)
-        except NotebookLMError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while adding source to NotebookLM notebook.",
-            ) from exc
-
-        return SourceUploadResponse(
-            status=result["status"],
-            message=result["message"],
-        )
-    finally:
-        # Clean up temporary file
-        if temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.unlink(temp_file_path)
-            except Exception:
-                # Ignore errors during cleanup
-                pass
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(delete_notebook_task, notebook_id, _headless(), _profile())
 
 
 @router.get(
     "/notebooks/{notebook_id}/sources",
-    response_model=SourceListResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Sources"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def list_sources_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> SourceListResponse:
-    """
-    List all sources in a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(list_sources_task, notebook_id, _headless(), _profile())
 
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
 
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
+@router.post(
+    "/notebooks/{notebook_id}/sources/upload",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def upload_source_endpoint(
+    notebook_id: str, file: UploadFile = File(...), current_user: CurrentUser = None
+) -> TaskSubmissionResponse:
     try:
-        result = await trigger_source_listing(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
+        suffix = Path(file.filename).suffix if file.filename else ".bin"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while listing sources from NotebookLM notebook.",
-        ) from exc
-
-    # Convert raw source entries to Source objects, supporting both legacy (string)
-    # and new (dict with status) formats for safety.
-    raw_sources = result.get("sources", [])
-    sources: list[Source] = []
-    for item in raw_sources:
-        if isinstance(item, dict):
-            sources.append(
-                Source(
-                    name=item.get("name", "").strip() if item.get("name") else "",
-                    status=item.get("status", "unknown"),
-                )
-            )
-        else:
-            # Backwards compatibility: when automation returns only the name
-            sources.append(
-                Source(
-                    name=str(item).strip() if item is not None else "",
-                    status="unknown",
-                )
-            )
-
-    return SourceListResponse(
-        status=result["status"],
-        message=result["message"],
-        sources=sources,
-    )
+            detail=f"Failed to store upload: {exc}",
+        )
+    return _submit(add_source_task, notebook_id, tmp_path, _headless(), _profile())
 
 
 @router.delete(
-    "/notebooks/{notebook_id}/sources/{source_name:path}",
-    status_code=status.HTTP_200_OK,
-    tags=["Sources"],
+    "/notebooks/{notebook_id}/sources/{source_name}",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def delete_source_endpoint(
-    notebook_id: str,
-    source_name: str,
-    current_user: CurrentUser,
-) -> dict:
-    """
-    Delete a source from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+    notebook_id: str, source_name: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(
+        delete_source_task, notebook_id, source_name, _headless(), _profile()
     )
 
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
 
-    try:
-        result = await trigger_source_deletion(page, notebook_id, source_name)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting source from NotebookLM notebook.",
-        ) from exc
-
-    return {
-        "status": result["status"],
-        "message": result["message"],
-    }
-
-
-@router.put(
-    "/notebooks/{notebook_id}/sources/{source_name:path}/rename",
-    response_model=SourceRenameResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Sources"],
+@router.post(
+    "/notebooks/{notebook_id}/sources/{source_name}/rename",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def rename_source_endpoint(
     notebook_id: str,
     source_name: str,
-    request: SourceRenameRequest,
+    payload: SourceRenameRequest,
     current_user: CurrentUser,
-) -> SourceRenameResponse:
-    """
-    Rename a source in a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_source_rename(
-            page, notebook_id, source_name, request.new_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while renaming source in NotebookLM notebook.",
-        ) from exc
-
-    return SourceRenameResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        rename_source_task,
+        notebook_id,
+        source_name,
+        payload.new_name,
+        _headless(),
+        _profile(),
     )
 
 
-@router.get(
-    "/notebooks/{notebook_id}/sources/{source_name:path}/review",
-    response_model=SourceReviewResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Sources"],
+@router.post(
+    "/notebooks/{notebook_id}/sources/{source_name}/review",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def review_source_endpoint(
-    notebook_id: str,
-    source_name: str,
-    current_user: CurrentUser,
-) -> SourceReviewResponse:
-    """
-    Get the review/content of a source in a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_source_review(page, notebook_id, source_name)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while reviewing source in NotebookLM notebook.",
-        ) from exc
-
-    # Convert image dicts to SourceImageInfo objects
-    images = [
-        SourceImageInfo(
-            base64=img.get("base64"),
-            mime_type=img.get("mime_type"),
-        )
-        for img in result.get("images", [])
-    ]
-
-    return SourceReviewResponse(
-        status=result["status"],
-        message=result["message"],
-        title=result.get("title"),
-        summary=result.get("summary"),
-        key_topics=result.get("key_topics", []),
-        content=result.get("content"),
-        images=images,
+    notebook_id: str, source_name: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(
+        review_source_task, notebook_id, source_name, _headless(), _profile()
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/query",
-    response_model=NotebookQueryResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Chat"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def query_notebook_endpoint(
-    notebook_id: str,
-    request: NotebookQueryRequest,
-    current_user: CurrentUser,
-) -> NotebookQueryResponse:
-    """
-    Query a notebook in NotebookLM.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_notebook_query(page, notebook_id, request.query)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while querying NotebookLM notebook.",
-        ) from exc
-
-    return NotebookQueryResponse(
-        status=result["status"],
-        message=result["message"],
-        query=result["query"],
+    notebook_id: str, payload: NotebookQueryRequest, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(
+        query_notebook_task, notebook_id, payload.query, _headless(), _profile()
     )
 
 
 @router.get(
     "/notebooks/{notebook_id}/chat",
-    response_model=ChatHistoryResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Chat"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
-async def get_chat_history_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> ChatHistoryResponse:
-    """
-    Get the complete chat history from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_chat_history(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while retrieving chat history from NotebookLM notebook.",
-        ) from exc
-
-    # Convert messages to ChatMessage objects
-    chat_messages = [
-        ChatMessage(role=msg["role"], content=msg["content"])
-        for msg in result.get("messages", [])
-    ]
-
-    return ChatHistoryResponse(
-        status=result["status"],
-        message=result["message"],
-        messages=chat_messages,
-    )
+async def chat_history_endpoint(
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(get_chat_history_task, notebook_id, _headless(), _profile())
 
 
 @router.delete(
     "/notebooks/{notebook_id}/chat",
-    status_code=status.HTTP_200_OK,
-    tags=["Chat"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def delete_chat_history_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> dict:
-    """
-    Delete the chat history from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(delete_chat_history_task, notebook_id, _headless(), _profile())
 
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
 
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
+@router.get(
+    "/notebooks/{notebook_id}/artifacts",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def list_artifacts_endpoint(
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(list_artifacts_task, notebook_id, _headless(), _profile())
+
+
+@router.delete(
+    "/notebooks/{notebook_id}/artifacts/{artifact_name}",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def delete_artifact_endpoint(
+    notebook_id: str, artifact_name: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(
+        delete_artifact_task, notebook_id, artifact_name, _headless(), _profile()
     )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_chat_history_deletion(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting chat history from NotebookLM notebook.",
-        ) from exc
-
-    return {
-        "status": result["status"],
-        "message": result["message"],
-    }
 
 
 @router.post(
-    "/notebooks/{notebook_id}/audio-overview",
-    response_model=AudioOverviewCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Overviews"],
+    "/notebooks/{notebook_id}/artifacts/{artifact_name}/rename",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rename_artifact_endpoint(
+    notebook_id: str,
+    artifact_name: str,
+    payload: ArtifactRenameRequest,
+    current_user: CurrentUser,
+) -> TaskSubmissionResponse:
+    return _submit(
+        rename_artifact_task,
+        notebook_id,
+        artifact_name,
+        payload.new_name,
+        _headless(),
+        _profile(),
+    )
+
+
+@router.post(
+    "/notebooks/{notebook_id}/artifacts/{artifact_name}/download",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def download_artifact_endpoint(
+    notebook_id: str, artifact_name: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(
+        download_artifact_task, notebook_id, artifact_name, _headless(), _profile()
+    )
+
+
+@router.post(
+    "/notebooks/{notebook_id}/audio_overview",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_audio_overview_endpoint(
     notebook_id: str,
-    request: AudioOverviewCreateRequest,
+    payload: AudioOverviewCreateRequest,
     current_user: CurrentUser,
-) -> AudioOverviewCreateResponse:
-    """
-    Create an audio overview for a notebook.
-
-    Optional parameters:
-    - audio_format: "Deep Dive", "Brief", "Critique", or "Debate"
-    - language: "english" or "persian"
-    - length: Format dependent - Deep Dive (Short/Default/Long), Brief (none), Critique/Debate (Short/Default)
-    - focus_text: Optional focus text for the AI hosts (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_audio_overview_creation(
-            page,
-            notebook_id,
-            audio_format=request.audio_format.value if request.audio_format else None,
-            language=request.language.value if request.language else None,
-            length=request.length,
-            focus_text=request.focus_text,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating audio overview.",
-        ) from exc
-
-    return AudioOverviewCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_audio_overview_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.audio_format.value if payload.audio_format else None,
+        payload.language.value if payload.language else None,
+        payload.length,
+        payload.focus_text,
     )
 
 
 @router.post(
-    "/notebooks/{notebook_id}/video-overview",
-    response_model=VideoOverviewCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Overviews"],
+    "/notebooks/{notebook_id}/video_overview",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_video_overview_endpoint(
     notebook_id: str,
-    request: VideoOverviewCreateRequest,
+    payload: VideoOverviewCreateRequest,
     current_user: CurrentUser,
-) -> VideoOverviewCreateResponse:
-    """
-    Create a video overview for a notebook.
-
-    Optional parameters:
-    - video_format: "Explainer" or "Brief"
-    - language: "english" or "persian"
-    - visual_style: "Auto-select", "Custom", "Classic", "Whiteboard", "Kawaii", "Anime", "Watercolor", "Retro print", "Heritage", or "Paper-craft"
-    - custom_style_description: Custom visual style description (required when visual_style is Custom, max 5000 chars)
-    - focus_text: Optional focus text for the AI hosts (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_video_overview_creation(
-            page,
-            notebook_id,
-            video_format=request.video_format.value if request.video_format else None,
-            language=request.language.value if request.language else None,
-            visual_style=request.visual_style.value if request.visual_style else None,
-            custom_style_description=request.custom_style_description,
-            focus_text=request.focus_text,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating video overview.",
-        ) from exc
-
-    return VideoOverviewCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_video_overview_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.video_format.value if payload.video_format else None,
+        payload.language.value if payload.language else None,
+        payload.visual_style.value if payload.visual_style else None,
+        payload.custom_style_description,
+        payload.focus_text,
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/flashcards",
-    response_model=FlashcardCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_flashcards_endpoint(
     notebook_id: str,
-    request: FlashcardCreateRequest,
+    payload: FlashcardCreateRequest,
     current_user: CurrentUser,
-) -> FlashcardCreateResponse:
-    """
-    Create flashcards for a notebook.
-
-    Optional parameters:
-    - card_count: "Fewer", "Standard", or "More"
-    - difficulty: "Easy", "Medium", or "Hard"
-    - topic: Optional topic description for the flashcards (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_flashcard_creation(
-            page,
-            notebook_id,
-            card_count=request.card_count.value if request.card_count else None,
-            difficulty=request.difficulty.value if request.difficulty else None,
-            topic=request.topic,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating flashcards.",
-        ) from exc
-
-    return FlashcardCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_flashcards_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.card_count,
+        payload.difficulty,
+        payload.topic,
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/quiz",
-    response_model=QuizCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_quiz_endpoint(
     notebook_id: str,
-    request: QuizCreateRequest,
+    payload: QuizCreateRequest,
     current_user: CurrentUser,
-) -> QuizCreateResponse:
-    """
-    Create a quiz for a notebook.
-
-    Optional parameters:
-    - question_count: "Fewer", "Standard", or "More"
-    - difficulty: "Easy", "Medium", or "Hard"
-    - topic: Optional topic description for the quiz (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_quiz_creation(
-            page,
-            notebook_id,
-            question_count=request.question_count.value if request.question_count else None,
-            difficulty=request.difficulty.value if request.difficulty else None,
-            topic=request.topic,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating quiz.",
-        ) from exc
-
-    return QuizCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_quiz_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.question_count,
+        payload.difficulty,
+        payload.topic,
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/infographic",
-    response_model=InfographicCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_infographic_endpoint(
     notebook_id: str,
-    request: InfographicCreateRequest,
+    payload: InfographicCreateRequest,
     current_user: CurrentUser,
-) -> InfographicCreateResponse:
-    """
-    Create an infographic for a notebook.
-
-    Optional parameters:
-    - language: "english" or "persian"
-    - orientation: "Landscape", "Portrait", or "Square"
-    - detail_level: "Concise", "Standard", or "Detailed BETA"
-    - description: Optional description for the infographic (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_infographic_creation(
-            page,
-            notebook_id,
-            language=request.language.value if request.language else None,
-            orientation=request.orientation.value if request.orientation else None,
-            detail_level=request.detail_level.value if request.detail_level else None,
-            description=request.description,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating infographic.",
-        ) from exc
-
-    return InfographicCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_infographic_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.language,
+        payload.orientation,
+        payload.detail_level,
+        payload.description,
     )
 
 
 @router.post(
-    "/notebooks/{notebook_id}/slide-deck",
-    response_model=SlideDeckCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    "/notebooks/{notebook_id}/slide_deck",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_slide_deck_endpoint(
     notebook_id: str,
-    request: SlideDeckCreateRequest,
+    payload: SlideDeckCreateRequest,
     current_user: CurrentUser,
-) -> SlideDeckCreateResponse:
-    """
-    Create a slide deck for a notebook.
-
-    Optional parameters:
-    - format: "Detailed Deck" or "Presenter Slides"
-    - length: "Short" or "Default"
-    - language: "english" or "persian"
-    - description: Optional description for the slide deck (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_slide_deck_creation(
-            page,
-            notebook_id,
-            format=request.format.value if request.format else None,
-            length=request.length.value if request.length else None,
-            language=request.language.value if request.language else None,
-            description=request.description,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating slide deck.",
-        ) from exc
-
-    return SlideDeckCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_slide_deck_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.format,
+        payload.length,
+        payload.language,
+        payload.description,
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/report",
-    response_model=ReportCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_report_endpoint(
     notebook_id: str,
-    request: ReportCreateRequest,
+    payload: ReportCreateRequest,
     current_user: CurrentUser,
-) -> ReportCreateResponse:
-    """
-    Create a report for a notebook.
-
-    Optional parameters:
-    - format: Report format - "Create Your Own", "Briefing Doc", "Study Guide", "Blog Post", etc.
-    - language: "english" or "persian"
-    - description: Description of the report to create (max 5000 chars)
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_report_creation(
-            page,
-            notebook_id,
-            format=request.format.value if request.format else None,
-            language=request.language.value if request.language else None,
-            description=request.description,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating report.",
-        ) from exc
-
-    return ReportCreateResponse(
-        status=result["status"],
-        message=result["message"],
+) -> TaskSubmissionResponse:
+    return _submit(
+        create_report_task,
+        notebook_id,
+        _headless(),
+        _profile(),
+        payload.format,
+        payload.language,
+        payload.description,
     )
 
 
 @router.post(
     "/notebooks/{notebook_id}/mindmap",
-    response_model=MindmapCreateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_mindmap_endpoint(
-    notebook_id: str,
-    request: MindmapCreateRequest,
-    current_user: CurrentUser,
-) -> MindmapCreateResponse:
-    """
-    Create a mind map for a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_mindmap_creation(
-            page,
-            notebook_id,
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while creating mind map.",
-        ) from exc
-
-    return MindmapCreateResponse(
-        status=result["status"],
-        message=result["message"],
-    )
+    notebook_id: str, payload: MindmapCreateRequest, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(create_mindmap_task, notebook_id, _headless(), _profile())
 
 
 @router.get(
-    "/notebooks/{notebook_id}/artifacts",
-    response_model=ArtifactListResponse,
+    "/tasks/{task_id}",
+    response_model=TaskStatusResponse,
     status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
 )
-async def list_artifacts_endpoint(
-    notebook_id: str,
-    current_user: CurrentUser,
-) -> ArtifactListResponse:
-    """
-    List all artifacts (materials) in a notebook with their status.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_artifact_listing(page, notebook_id)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while listing artifacts from NotebookLM notebook.",
-        ) from exc
-
-    # Convert artifact dicts to ArtifactInfo objects
-    artifacts = [
-        ArtifactInfo(
-            type=artifact.get("type"),
-            name=artifact.get("name"),
-            details=artifact.get("details"),
-            status=artifact.get("status", "unknown"),
-            is_generating=artifact.get("is_generating", False),
-            has_play=artifact.get("has_play", False),
-            has_interactive=artifact.get("has_interactive", False),
-        )
-        for artifact in result.get("artifacts", [])
-    ]
-
-    return ArtifactListResponse(
-        status=result["status"],
-        message=result["message"],
-        artifacts=artifacts,
-    )
-
-
-@router.delete(
-    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}",
-    response_model=ArtifactDeleteResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
-)
-async def delete_artifact_endpoint(
-    notebook_id: str,
-    artifact_name: str,
-    current_user: CurrentUser,
-) -> ArtifactDeleteResponse:
-    """
-    Delete an artifact from a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_artifact_deletion(page, notebook_id, artifact_name)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while deleting artifact from NotebookLM notebook.",
-        ) from exc
-
-    return ArtifactDeleteResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
-@router.put(
-    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/rename",
-    response_model=ArtifactRenameResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
-)
-async def rename_artifact_endpoint(
-    notebook_id: str,
-    artifact_name: str,
-    request: ArtifactRenameRequest,
-    current_user: CurrentUser,
-) -> ArtifactRenameResponse:
-    """
-    Rename an audio or video overview artifact in a notebook.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_artifact_rename(
-            page, notebook_id, artifact_name, request.new_name
-        )
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while renaming artifact in NotebookLM notebook.",
-        ) from exc
-
-    return ArtifactRenameResponse(
-        status=result["status"],
-        message=result["message"],
-    )
-
-
-@router.get(
-    "/notebooks/{notebook_id}/artifacts/{artifact_name:path}/download",
-    status_code=status.HTTP_200_OK,
-    tags=["Artifacts"],
-)
-async def download_artifact_endpoint(
-    notebook_id: str,
-    artifact_name: str,
-    current_user: CurrentUser,
-):
-    """
-    Download an artifact (audio overview, video overview, or mind map) from a notebook.
-    Returns the file as a downloadable file response.
-    For mind maps, returns a PNG screenshot of the mind map.
-    """
-    page = get_browser_page()
-    if page is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Browser page not initialized. Please check server logs.",
-        )
-
-    # Ensure we have an async page (should always be the case with async initialization)
-    if not isinstance(page, Page):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Browser page type mismatch. Expected async page.",
-        )
-
-    # Verify the notebook belongs to the current user
-    notebooks_data = await get_notebooks_by_user(current_user.username)
-    notebook_exists = any(
-        notebook["notebook_id"] == notebook_id for notebook in notebooks_data
-    )
-
-    if not notebook_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Notebook {notebook_id} not found for the current user.",
-        )
-
-    try:
-        result = await trigger_artifact_download(page, notebook_id, artifact_name)
-    except NotebookLMError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected error while downloading artifact from NotebookLM notebook.",
-        ) from exc
-
-    download_path = result.get("download_path")
-    suggested_filename = result.get("suggested_filename")
-    artifact_type = result.get("artifact_type")
-
-    if not download_path or not os.path.exists(download_path):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Downloaded file not found. The download may have failed.",
-        )
-
-    # Determine media type and default filename based on artifact type
-    if artifact_type == "video_overview":
-        default_filename = suggested_filename or "video_overview.mp4"
-        media_type = "video/mp4"
-    elif artifact_type == "mind_map":
-        # Mind maps are returned as PNG files
-        default_filename = suggested_filename or "mind_map.png"
-        media_type = "image/png"
-    else:  # audio_overview
-        default_filename = suggested_filename or "audio_overview.m4a"
-        media_type = "audio/mp4"  # m4a files use audio/mp4 MIME type
-
-    # Return the file as a downloadable response
-    return FileResponse(
-        path=download_path,
-        filename=default_filename,
-        media_type=media_type,
-    )
+async def task_status(task_id: str) -> TaskStatusResponse:
+    return _task_status(task_id)

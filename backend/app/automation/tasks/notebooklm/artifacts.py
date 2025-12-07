@@ -1,9 +1,8 @@
 """Artifact listing operations for NotebookLM automation."""
 
-import os
 import re
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from playwright.async_api import Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -80,9 +79,11 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
         for i in range(item_count):
             try:
                 artifact_item = artifact_items.nth(i)
-                
+
                 # Get the artifact button
-                artifact_button = artifact_item.locator("button.artifact-button-content").first
+                artifact_button = artifact_item.locator(
+                    "button.artifact-button-content"
+                ).first
                 if await artifact_button.count() == 0:
                     continue
 
@@ -117,19 +118,24 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
                 # Determine status based on available actions
                 status = "ready"
                 is_generating = False
-                
+
                 # Check if there's a Play button (indicates ready)
                 play_button = artifact_button.locator('button[aria-label="Play"]')
                 has_play = await play_button.count() > 0
-                
+
                 # Check if there's an Interactive mode button
-                interactive_button = artifact_button.locator('button[aria-label="Interactive mode"]')
+                interactive_button = artifact_button.locator(
+                    'button[aria-label="Interactive mode"]'
+                )
                 has_interactive = await interactive_button.count() > 0
 
                 # Check if this artifact is mentioned in generating messages
                 if artifact_name:
                     for gen_msg in generating_messages:
-                        if artifact_name.lower() in gen_msg.lower() or artifact_type in gen_msg.lower():
+                        if (
+                            artifact_name.lower() in gen_msg.lower()
+                            or artifact_type in gen_msg.lower()
+                        ):
                             is_generating = True
                             status = "generating"
                             break
@@ -138,15 +144,17 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
                     # Might be incomplete or error state
                     status = "unknown"
 
-                artifacts.append({
-                    "type": artifact_type,
-                    "name": artifact_name,
-                    "details": details,
-                    "status": status,
-                    "is_generating": is_generating,
-                    "has_play": has_play,
-                    "has_interactive": has_interactive,
-                })
+                artifacts.append(
+                    {
+                        "type": artifact_type,
+                        "name": artifact_name,
+                        "details": details,
+                        "status": status,
+                        "is_generating": is_generating,
+                        "has_play": has_play,
+                        "has_interactive": has_interactive,
+                    }
+                )
             except Exception:
                 # Skip this artifact if there's an error
                 continue
@@ -158,9 +166,11 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
         for i in range(note_count):
             try:
                 artifact_note = artifact_notes.nth(i)
-                
+
                 # Get the artifact button
-                artifact_button = artifact_note.locator("button.artifact-button-content").first
+                artifact_button = artifact_note.locator(
+                    "button.artifact-button-content"
+                ).first
                 if await artifact_button.count() == 0:
                     continue
 
@@ -194,22 +204,26 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
                 # Notes are typically ready
                 status = "ready"
                 is_generating = False
-                
+
                 play_button = artifact_button.locator('button[aria-label="Play"]')
                 has_play = await play_button.count() > 0
-                
-                interactive_button = artifact_button.locator('button[aria-label="Interactive mode"]')
+
+                interactive_button = artifact_button.locator(
+                    'button[aria-label="Interactive mode"]'
+                )
                 has_interactive = await interactive_button.count() > 0
 
-                artifacts.append({
-                    "type": artifact_type or "note",
-                    "name": artifact_name,
-                    "details": details,
-                    "status": status,
-                    "is_generating": is_generating,
-                    "has_play": has_play,
-                    "has_interactive": has_interactive,
-                })
+                artifacts.append(
+                    {
+                        "type": artifact_type or "note",
+                        "name": artifact_name,
+                        "details": details,
+                        "status": status,
+                        "is_generating": is_generating,
+                        "has_play": has_play,
+                        "has_interactive": has_interactive,
+                    }
+                )
             except Exception:
                 continue
 
@@ -221,10 +235,14 @@ async def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
     except NotebookLMError:
         raise
     except Exception as exc:
-        raise NotebookLMError(f"Failed to list artifacts from NotebookLM notebook: {exc}") from exc
+        raise NotebookLMError(
+            f"Failed to list artifacts from NotebookLM notebook: {exc}"
+        ) from exc
 
 
-async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[str, str]:
+async def delete_artifact(
+    page: Page, notebook_id: str, artifact_name: str
+) -> Dict[str, str]:
     """
     Deletes an artifact from a notebook.
 
@@ -257,15 +275,15 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
         # Try to match by artifact title first, then fall back to full button text
         artifact_button = None
         artifact_item = None
-        
+
         try:
             # Get all artifact buttons
             artifact_items = artifact_library.locator("artifact-library-item")
             artifact_notes = artifact_library.locator("artifact-library-note")
-            
+
             item_count = await artifact_items.count()
             note_count = await artifact_notes.count()
-            
+
             # Check artifact-library-item elements
             for i in range(item_count):
                 try:
@@ -273,7 +291,7 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
                     button = item.locator("button.artifact-button-content").first
                     if await button.count() == 0:
                         continue
-                    
+
                     # First, try to match by artifact title (more precise)
                     title_element = button.locator("span.artifact-title").first
                     if await title_element.count() > 0:
@@ -283,7 +301,7 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
                             artifact_button = button
                             artifact_item = item
                             break
-                    
+
                     # Fallback: check full button text (includes name and details)
                     button_text = await button.inner_text()
                     button_text = button_text.strip() if button_text else ""
@@ -293,7 +311,7 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
                         break
                 except Exception:
                     continue
-            
+
             # If not found, check artifact-library-note elements
             if not artifact_button:
                 for i in range(note_count):
@@ -302,17 +320,20 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
                         button = note.locator("button.artifact-button-content").first
                         if await button.count() == 0:
                             continue
-                        
+
                         # First, try to match by artifact title
                         title_element = button.locator("span.artifact-title").first
                         if await title_element.count() > 0:
                             title_text = await title_element.inner_text()
                             title_text = title_text.strip() if title_text else ""
-                            if title_text == artifact_name or artifact_name in title_text:
+                            if (
+                                title_text == artifact_name
+                                or artifact_name in title_text
+                            ):
                                 artifact_button = button
                                 artifact_item = note
                                 break
-                        
+
                         # Fallback: check full button text
                         button_text = await button.inner_text()
                         button_text = button_text.strip() if button_text else ""
@@ -322,7 +343,7 @@ async def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> D
                             break
                     except Exception:
                         continue
-            
+
             if not artifact_button or not artifact_item:
                 raise NotebookLMError(
                     f"Could not find artifact with name '{artifact_name}'. "
@@ -536,10 +557,12 @@ async def rename_artifact(
         raise NotebookLMError(f"Failed to rename artifact: {exc}") from exc
 
 
-async def download_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[str, Any]:
+async def download_artifact(
+    page: Page, notebook_id: str, artifact_name: str
+) -> Dict[str, Any]:
     """
     Downloads an artifact (audio overview, video overview, or mind map) from a notebook.
-    
+
     For mind maps, creates a PNG screenshot of the mind map view.
 
     Args:
@@ -572,15 +595,15 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
         artifact_button = None
         artifact_item = None
         artifact_type = None
-        
+
         try:
             # Get all artifact buttons
             artifact_items = artifact_library.locator("artifact-library-item")
             artifact_notes = artifact_library.locator("artifact-library-note")
-            
+
             item_count = await artifact_items.count()
             note_count = await artifact_notes.count()
-            
+
             # Check artifact-library-item elements
             for i in range(item_count):
                 try:
@@ -588,7 +611,7 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                     button = item.locator("button.artifact-button-content").first
                     if await button.count() == 0:
                         continue
-                    
+
                     # Get artifact type from icon
                     icon_element = item.locator("mat-icon.artifact-icon").first
                     if await icon_element.count() > 0:
@@ -603,7 +626,7 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                             artifact_type = "mind_map"
                         else:
                             continue  # Skip unsupported artifacts
-                    
+
                     # First, try to match by artifact title (more precise)
                     title_element = button.locator("span.artifact-title").first
                     if await title_element.count() > 0:
@@ -613,7 +636,7 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                             artifact_button = button
                             artifact_item = item
                             break
-                    
+
                     # Fallback: check full button text (includes name and details)
                     button_text = await button.inner_text()
                     button_text = button_text.strip() if button_text else ""
@@ -623,7 +646,7 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                         break
                 except Exception:
                     continue
-            
+
             # If not found, check artifact-library-note elements (unlikely for audio/video, but just in case)
             if not artifact_button:
                 for i in range(note_count):
@@ -632,7 +655,7 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                         button = note.locator("button.artifact-button-content").first
                         if await button.count() == 0:
                             continue
-                        
+
                         # Get artifact type from icon
                         icon_element = note.locator("mat-icon.artifact-icon").first
                         if await icon_element.count() > 0:
@@ -646,17 +669,20 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                                 artifact_type = "mind_map"
                             else:
                                 continue
-                        
+
                         # First, try to match by artifact title
                         title_element = button.locator("span.artifact-title").first
                         if await title_element.count() > 0:
                             title_text = await title_element.inner_text()
                             title_text = title_text.strip() if title_text else ""
-                            if title_text == artifact_name or artifact_name in title_text:
+                            if (
+                                title_text == artifact_name
+                                or artifact_name in title_text
+                            ):
                                 artifact_button = button
                                 artifact_item = note
                                 break
-                        
+
                         # Fallback: check full button text
                         button_text = await button.inner_text()
                         button_text = button_text.strip() if button_text else ""
@@ -666,13 +692,13 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                             break
                     except Exception:
                         continue
-            
+
             if not artifact_button or not artifact_item:
                 raise NotebookLMError(
                     f"Could not find artifact with name '{artifact_name}'. "
                     "Please ensure the artifact exists and is of type audio_overview, video_overview, or mind_map."
                 )
-            
+
             if not artifact_type:
                 raise NotebookLMError(
                     f"Artifact '{artifact_name}' is not a supported type. "
@@ -688,16 +714,16 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
         # Set up download listener
         download_path_str = None
         suggested_filename = None
-        
+
         try:
             if artifact_type == "mind_map":
                 # Mind map downloads require clicking the artifact button, collapsing nodes, then taking a PNG screenshot
                 # Click the artifact button to open it
                 await artifact_button.click()
-                
+
                 # Wait for the mind map view to load
                 await page.wait_for_timeout(2_000)
-                
+
                 # Wait for the SVG to be present in the DOM
                 try:
                     svg_locator = page.locator("mindmap-viewer svg")
@@ -706,40 +732,44 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
                     raise NotebookLMError(
                         "Mind map SVG not found. The mind map view may not have loaded correctly."
                     )
-                
+
                 # Click the button with the artifact name (may be needed to focus/select the mindmap)
                 try:
-                    artifact_name_button = page.get_by_role("button", name=artifact_name)
+                    artifact_name_button = page.get_by_role(
+                        "button", name=artifact_name
+                    )
                     await artifact_name_button.wait_for(timeout=10_000, state="visible")
                     await artifact_name_button.click()
                     await page.wait_for_timeout(500)
                 except PlaywrightTimeoutError:
                     # If button with artifact name is not found, continue anyway
                     pass
-                
+
                 # Click "Collapse all nodes" button
                 try:
-                    collapse_button = page.get_by_role("button", name="Collapse all nodes")
+                    collapse_button = page.get_by_role(
+                        "button", name="Collapse all nodes"
+                    )
                     await collapse_button.wait_for(timeout=10_000, state="visible")
                     await collapse_button.click()
                     await page.wait_for_timeout(500)
                 except PlaywrightTimeoutError:
                     # If collapse button is not found, continue anyway
                     pass
-                
+
                 # Wait a bit more for any animations to settle
                 await page.wait_for_timeout(500)
-                
+
                 # Take screenshot of the SVG element to create PNG
                 with tempfile.NamedTemporaryFile(
-                    suffix='.png', delete=False
+                    suffix=".png", delete=False
                 ) as temp_png:
                     png_temp_file = temp_png.name
-                
+
                 await svg_locator.screenshot(path=png_temp_file)
-                
+
                 download_path_str = png_temp_file
-                safe_name = artifact_name.replace(' ', '_').replace('/', '_')
+                safe_name = artifact_name.replace(" ", "_").replace("/", "_")
                 suggested_filename = f"{safe_name}.png"
             elif artifact_type == "video_overview":
                 # Video downloads open a popup that needs to be closed
@@ -750,19 +780,19 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
 
                 # Wait for the menu to appear and be ready
                 await page.wait_for_timeout(1_500)
-                
+
                 async with page.expect_download() as download_info:
                     async with page.expect_popup() as popup_info:
                         # Click on "Download" menuitem
                         await _click_download_menuitem(page)
-                    
+
                     # Wait for popup and close it
                     popup = await popup_info.value
                     await popup.close()
-                
+
                 # Get the download
                 download = await download_info.value
-                
+
                 # Get download path and convert to string
                 download_path = await download.path()
                 download_path_str = str(download_path) if download_path else None
@@ -776,14 +806,14 @@ async def download_artifact(page: Page, notebook_id: str, artifact_name: str) ->
 
                 # Wait for the menu to appear and be ready
                 await page.wait_for_timeout(1_500)
-                
+
                 async with page.expect_download() as download_info:
                     # Click on "Download" menuitem
                     await _click_download_menuitem(page)
-                
+
                 # Get the download
                 download = await download_info.value
-                
+
                 # Get download path and convert to string
                 download_path = await download.path()
                 download_path_str = str(download_path) if download_path else None
@@ -818,30 +848,39 @@ async def _click_download_menuitem(page: Page) -> None:
     except PlaywrightTimeoutError:
         # Strategy 2: Find button with role="menuitem" containing Download text
         try:
-            download_menuitem = page.locator("button[role='menuitem']").filter(has_text="Download")
+            download_menuitem = page.locator("button[role='menuitem']").filter(
+                has_text="Download"
+            )
             await download_menuitem.wait_for(timeout=10_000, state="visible")
             await download_menuitem.click()
         except PlaywrightTimeoutError:
             # Strategy 3: Find any button with Download text in mat-menu
             try:
-                download_menuitem = page.locator("mat-menu button").filter(has_text="Download")
+                download_menuitem = page.locator("mat-menu button").filter(
+                    has_text="Download"
+                )
                 await download_menuitem.wait_for(timeout=10_000, state="visible")
                 await download_menuitem.click()
             except PlaywrightTimeoutError:
                 # Strategy 4: Find in overlay panel (Material menus are often in overlays)
                 try:
-                    download_menuitem = page.locator(".cdk-overlay-pane button").filter(has_text="Download")
+                    download_menuitem = page.locator(".cdk-overlay-pane button").filter(
+                        has_text="Download"
+                    )
                     await download_menuitem.wait_for(timeout=10_000, state="visible")
                     await download_menuitem.click()
                 except PlaywrightTimeoutError:
                     # Strategy 5: Find any visible button with Download text
                     try:
-                        download_menuitem = page.locator("button:visible").filter(has_text=re.compile(r"Download", re.IGNORECASE))
-                        await download_menuitem.wait_for(timeout=10_000, state="visible")
+                        download_menuitem = page.locator("button:visible").filter(
+                            has_text=re.compile(r"Download", re.IGNORECASE)
+                        )
+                        await download_menuitem.wait_for(
+                            timeout=10_000, state="visible"
+                        )
                         await download_menuitem.click()
                     except PlaywrightTimeoutError as exc:
                         raise NotebookLMError(
                             "Could not find the 'Download' menuitem. "
                             "The menu may not have appeared correctly."
                         ) from exc
-
