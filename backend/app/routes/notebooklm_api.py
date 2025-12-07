@@ -47,7 +47,7 @@ from app.tasks.notebooklm import (
     review_source_task,
 )
 
-router = APIRouter(prefix="/notebooklm", tags=["NotebookLM"])
+router = APIRouter(prefix="/notebooklm")
 
 
 def _headless() -> bool:
@@ -86,10 +86,16 @@ def _task_status(task_id: str) -> TaskStatusResponse:
     )
 
 
+# ============================================================================
+# Notebooks
+# ============================================================================
+
+
 @router.post(
     "/notebooks",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Notebooks"],
 )
 async def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
     return _submit(create_notebook_task, _headless(), _profile())
@@ -99,6 +105,7 @@ async def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionR
     "/notebooks/{notebook_id}",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Notebooks"],
 )
 async def delete_notebook_endpoint(
     notebook_id: str, current_user: CurrentUser
@@ -106,10 +113,16 @@ async def delete_notebook_endpoint(
     return _submit(delete_notebook_task, notebook_id, _headless(), _profile())
 
 
+# ============================================================================
+# Sources
+# ============================================================================
+
+
 @router.get(
     "/notebooks/{notebook_id}/sources",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
 )
 async def list_sources_endpoint(
     notebook_id: str, current_user: CurrentUser
@@ -121,6 +134,7 @@ async def list_sources_endpoint(
     "/notebooks/{notebook_id}/sources/upload",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
 )
 async def upload_source_endpoint(
     notebook_id: str, file: UploadFile = File(...), current_user: CurrentUser = None
@@ -143,6 +157,7 @@ async def upload_source_endpoint(
     "/notebooks/{notebook_id}/sources/{source_name}",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
 )
 async def delete_source_endpoint(
     notebook_id: str, source_name: str, current_user: CurrentUser
@@ -156,6 +171,7 @@ async def delete_source_endpoint(
     "/notebooks/{notebook_id}/sources/{source_name}/rename",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
 )
 async def rename_source_endpoint(
     notebook_id: str,
@@ -177,6 +193,7 @@ async def rename_source_endpoint(
     "/notebooks/{notebook_id}/sources/{source_name}/review",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
 )
 async def review_source_endpoint(
     notebook_id: str, source_name: str, current_user: CurrentUser
@@ -186,10 +203,26 @@ async def review_source_endpoint(
     )
 
 
+# ============================================================================
+# Chat
+# ============================================================================
+@router.get(
+    "/notebooks/{notebook_id}/chat",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Chat"],
+)
+async def chat_history_endpoint(
+    notebook_id: str, current_user: CurrentUser
+) -> TaskSubmissionResponse:
+    return _submit(get_chat_history_task, notebook_id, _headless(), _profile())
+
+
 @router.post(
     "/notebooks/{notebook_id}/query",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Chat"],
 )
 async def query_notebook_endpoint(
     notebook_id: str, payload: NotebookQueryRequest, current_user: CurrentUser
@@ -199,21 +232,11 @@ async def query_notebook_endpoint(
     )
 
 
-@router.get(
-    "/notebooks/{notebook_id}/chat",
-    response_model=TaskSubmissionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def chat_history_endpoint(
-    notebook_id: str, current_user: CurrentUser
-) -> TaskSubmissionResponse:
-    return _submit(get_chat_history_task, notebook_id, _headless(), _profile())
-
-
 @router.delete(
     "/notebooks/{notebook_id}/chat",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Chat"],
 )
 async def delete_chat_history_endpoint(
     notebook_id: str, current_user: CurrentUser
@@ -221,10 +244,16 @@ async def delete_chat_history_endpoint(
     return _submit(delete_chat_history_task, notebook_id, _headless(), _profile())
 
 
+# ============================================================================
+# Artifacts - Management
+# ============================================================================
+
+
 @router.get(
     "/notebooks/{notebook_id}/artifacts",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Management"],
 )
 async def list_artifacts_endpoint(
     notebook_id: str, current_user: CurrentUser
@@ -236,6 +265,7 @@ async def list_artifacts_endpoint(
     "/notebooks/{notebook_id}/artifacts/{artifact_name}",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Management"],
 )
 async def delete_artifact_endpoint(
     notebook_id: str, artifact_name: str, current_user: CurrentUser
@@ -249,6 +279,7 @@ async def delete_artifact_endpoint(
     "/notebooks/{notebook_id}/artifacts/{artifact_name}/rename",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Management"],
 )
 async def rename_artifact_endpoint(
     notebook_id: str,
@@ -270,6 +301,7 @@ async def rename_artifact_endpoint(
     "/notebooks/{notebook_id}/artifacts/{artifact_name}/download",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Management"],
 )
 async def download_artifact_endpoint(
     notebook_id: str, artifact_name: str, current_user: CurrentUser
@@ -279,10 +311,16 @@ async def download_artifact_endpoint(
     )
 
 
+# ============================================================================
+# Artifacts - Creation
+# ============================================================================
+
+
 @router.post(
     "/notebooks/{notebook_id}/audio_overview",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_audio_overview_endpoint(
     notebook_id: str,
@@ -305,6 +343,7 @@ async def create_audio_overview_endpoint(
     "/notebooks/{notebook_id}/video_overview",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_video_overview_endpoint(
     notebook_id: str,
@@ -328,6 +367,7 @@ async def create_video_overview_endpoint(
     "/notebooks/{notebook_id}/flashcards",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_flashcards_endpoint(
     notebook_id: str,
@@ -349,6 +389,7 @@ async def create_flashcards_endpoint(
     "/notebooks/{notebook_id}/quiz",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_quiz_endpoint(
     notebook_id: str,
@@ -370,6 +411,7 @@ async def create_quiz_endpoint(
     "/notebooks/{notebook_id}/infographic",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_infographic_endpoint(
     notebook_id: str,
@@ -392,6 +434,7 @@ async def create_infographic_endpoint(
     "/notebooks/{notebook_id}/slide_deck",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_slide_deck_endpoint(
     notebook_id: str,
@@ -414,6 +457,7 @@ async def create_slide_deck_endpoint(
     "/notebooks/{notebook_id}/report",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_report_endpoint(
     notebook_id: str,
@@ -435,6 +479,7 @@ async def create_report_endpoint(
     "/notebooks/{notebook_id}/mindmap",
     response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Artifacts - Creation"],
 )
 async def create_mindmap_endpoint(
     notebook_id: str, payload: MindmapCreateRequest, current_user: CurrentUser
@@ -442,10 +487,16 @@ async def create_mindmap_endpoint(
     return _submit(create_mindmap_task, notebook_id, _headless(), _profile())
 
 
+# ============================================================================
+# Tasks
+# ============================================================================
+
+
 @router.get(
     "/tasks/{task_id}",
     response_model=TaskStatusResponse,
     status_code=status.HTTP_200_OK,
+    tags=["Tasks"],
 )
 async def task_status(task_id: str) -> TaskStatusResponse:
     return _task_status(task_id)
