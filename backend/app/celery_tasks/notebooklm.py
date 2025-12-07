@@ -2,12 +2,10 @@
 Celery tasks for NotebookLM operations using sync Playwright.
 """
 
-import asyncio
-import os
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from app.automation.tasks.google_login import check_or_login_google_sync
+from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.automation.tasks.notebooklm.sync_flows import (
     add_source_to_notebook,
     create_audio_overview,
@@ -33,97 +31,112 @@ from app.automation.tasks.notebooklm.sync_flows import (
     review_source,
 )
 from app.celery_app import celery_app
-from app.utils.browser_pool import (
-    acquire_browser,
-    ensure_pool_initialized,
-    release_browser,
-)
-
-pool_size = int(os.getenv("BROWSER_POOL_SIZE", "1"))
+from app.utils.browser_utils import initialize_page_sync
 
 
 def _run_with_browser(
-    headless: bool, user_profile_name: str, fn, *args, **kwargs
+    flow_func: Callable, headless: bool, profile: str, *flow_args, **flow_kwargs
 ) -> Dict[str, Any]:
-    ensure_pool_initialized(
-        pool_size=pool_size, headless=headless, base_profile=user_profile_name
-    )
-    resource = acquire_browser(headless=headless, base_profile=user_profile_name)
+    """
+    Helper function to initialize browser, ensure login, run flow, and clean up.
+    
+    Args:
+        flow_func: The sync flow function to execute (takes page as first arg)
+        headless: Whether to run browser in headless mode
+        profile: User profile name for browser
+        *flow_args: Positional arguments to pass to flow_func after page
+        **flow_kwargs: Keyword arguments to pass to flow_func
+    
+    Returns:
+        Dictionary with status and message from the flow function
+    """
+    page = None
+    context = None
+    playwright = None
+
     try:
-        check_or_login_google_sync(resource.page)
-        return fn(resource.page, *args, **kwargs)
+        # Initialize browser
+        page, context, playwright = initialize_page_sync(
+            headless=headless, user_profile_name=profile
+        )
+
+        # Ensure Google login
+        check_or_login_google_sync(page)
+
+        # Run the flow function with the page and other args
+        result = flow_func(page, *flow_args, **flow_kwargs)
+        return result
+
+    except NotebookLMError as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {exc}",
+        }
     finally:
-        release_browser(resource)
+        # Clean up browser resources
+        if context:
+            try:
+                context.close()
+            except Exception:
+                pass
+        if playwright:
+            try:
+                playwright.stop()
+            except Exception:
+                pass
 
 
-def _run_in_sync_thread(fn, *args, **kwargs) -> Dict[str, Any]:
-    """
-    Run sync Playwright code in a thread without an asyncio event loop.
-    Celery may run in an asyncio context even with solo pool, so we need
-    to ensure Playwright sync API runs in a clean thread.
-    """
-    def _call():
-        # Ensure this thread has no asyncio event loop
-        # ThreadPoolExecutor creates a new thread, but we need to ensure
-        # it doesn't have an event loop for Playwright sync API to work
-        try:
-            loop = asyncio.get_event_loop()
-            if not loop.is_closed():
-                loop.close()
-        except RuntimeError:
-            # No event loop exists - this is what we want
-            pass
-        
-        # Explicitly set event loop to None to ensure Playwright sync API works
-        asyncio.set_event_loop(None)
-        return fn(*args, **kwargs)
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_call)
-        return future.result()
-
-
-# -------- Notebooks --------
+# ============================================================================
+# Notebook tasks
+# ============================================================================
 
 
 @celery_app.task(name="notebooklm.create_notebook")
-def create_notebook_task(headless: bool, user_profile_name: str) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, create_notebook)
+def create_notebook_task(headless: bool, profile: str) -> Dict[str, Any]:
+    """Create a new NotebookLM notebook."""
+    return _run_with_browser(create_notebook, headless, profile)
 
 
 @celery_app.task(name="notebooklm.delete_notebook")
 def delete_notebook_task(
-    notebook_id: str, headless: bool, user_profile_name: str
+    notebook_id: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, delete_notebook, notebook_id)
+    """Delete a NotebookLM notebook."""
+    return _run_with_browser(delete_notebook, headless, profile, notebook_id)
 
 
-# -------- Sources --------
-
-
-@celery_app.task(name="notebooklm.list_sources")
-def list_sources_task(
-    notebook_id: str, headless: bool, user_profile_name: str
-) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, list_sources, notebook_id)
+# ============================================================================
+# Source tasks
+# ============================================================================
 
 
 @celery_app.task(name="notebooklm.add_source")
 def add_source_task(
-    notebook_id: str, file_path: str, headless: bool, user_profile_name: str
+    notebook_id: str, file_path: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, add_source_to_notebook, notebook_id, file_path
+    """Add a source file to a notebook."""
+    return _run_with_browser(
+        add_source_to_notebook, headless, profile, notebook_id, file_path
     )
+
+
+@celery_app.task(name="notebooklm.list_sources")
+def list_sources_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+    """List all sources in a notebook."""
+    return _run_with_browser(list_sources, headless, profile, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_source")
 def delete_source_task(
-    notebook_id: str, source_name: str, headless: bool, user_profile_name: str
+    notebook_id: str, source_name: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, delete_source, notebook_id, source_name
-    )
+    """Delete a source from a notebook."""
+    return _run_with_browser(delete_source, headless, profile, notebook_id, source_name)
 
 
 @celery_app.task(name="notebooklm.rename_source")
@@ -132,66 +145,65 @@ def rename_source_task(
     source_name: str,
     new_name: str,
     headless: bool,
-    user_profile_name: str,
+    profile: str,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, rename_source, notebook_id, source_name, new_name
+    """Rename a source in a notebook."""
+    return _run_with_browser(
+        rename_source, headless, profile, notebook_id, source_name, new_name
     )
 
 
 @celery_app.task(name="notebooklm.review_source")
 def review_source_task(
-    notebook_id: str, source_name: str, headless: bool, user_profile_name: str
+    notebook_id: str, source_name: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, review_source, notebook_id, source_name
-    )
+    """Open and review a source in a notebook."""
+    return _run_with_browser(review_source, headless, profile, notebook_id, source_name)
 
 
-# -------- Chat / Query --------
+# ============================================================================
+# Chat/Query tasks
+# ============================================================================
 
 
-@celery_app.task(name="notebooklm.query")
+@celery_app.task(name="notebooklm.query_notebook")
 def query_notebook_task(
-    notebook_id: str, query: str, headless: bool, user_profile_name: str
+    notebook_id: str, query: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, query_notebook, notebook_id, query
-    )
+    """Send a query to a notebook."""
+    return _run_with_browser(query_notebook, headless, profile, notebook_id, query)
 
 
 @celery_app.task(name="notebooklm.get_chat_history")
-def get_chat_history_task(
-    notebook_id: str, headless: bool, user_profile_name: str
-) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, get_chat_history, notebook_id)
+def get_chat_history_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+    """Get chat history for a notebook."""
+    return _run_with_browser(get_chat_history, headless, profile, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_chat_history")
-def delete_chat_history_task(
-    notebook_id: str, headless: bool, user_profile_name: str
-) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, delete_chat_history, notebook_id
-    )
+def delete_chat_history_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+    """Delete chat history for a notebook."""
+    return _run_with_browser(delete_chat_history, headless, profile, notebook_id)
 
 
-# -------- Artifacts --------
+# ============================================================================
+# Artifact management tasks
+# ============================================================================
 
 
 @celery_app.task(name="notebooklm.list_artifacts")
-def list_artifacts_task(
-    notebook_id: str, headless: bool, user_profile_name: str
-) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, list_artifacts, notebook_id)
+def list_artifacts_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+    """List all artifacts in a notebook."""
+    return _run_with_browser(list_artifacts, headless, profile, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_artifact")
 def delete_artifact_task(
-    notebook_id: str, artifact_name: str, headless: bool, user_profile_name: str
+    notebook_id: str, artifact_name: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, delete_artifact, notebook_id, artifact_name
+    """Delete an artifact from a notebook."""
+    return _run_with_browser(
+        delete_artifact, headless, profile, notebook_id, artifact_name
     )
 
 
@@ -201,46 +213,44 @@ def rename_artifact_task(
     artifact_name: str,
     new_name: str,
     headless: bool,
-    user_profile_name: str,
+    profile: str,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
-        rename_artifact,
-        notebook_id,
-        artifact_name,
-        new_name,
+    """Rename an artifact in a notebook."""
+    return _run_with_browser(
+        rename_artifact, headless, profile, notebook_id, artifact_name, new_name
     )
 
 
 @celery_app.task(name="notebooklm.download_artifact")
 def download_artifact_task(
-    notebook_id: str, artifact_name: str, headless: bool, user_profile_name: str
+    notebook_id: str, artifact_name: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser, headless, user_profile_name, download_artifact, notebook_id, artifact_name
+    """Download an artifact from a notebook."""
+    return _run_with_browser(
+        download_artifact, headless, profile, notebook_id, artifact_name
     )
 
 
-# -------- Generative assets --------
+# ============================================================================
+# Artifact creation tasks
+# ============================================================================
 
 
 @celery_app.task(name="notebooklm.create_audio_overview")
 def create_audio_overview_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    audio_format: str | None = None,
-    language: str | None = None,
-    length: str | None = None,
-    focus_text: str | None = None,
+    profile: str,
+    audio_format: Optional[str] = None,
+    language: Optional[str] = None,
+    length: Optional[str] = None,
+    focus_text: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create an audio overview artifact."""
+    return _run_with_browser(
         create_audio_overview,
+        headless,
+        profile,
         notebook_id,
         audio_format,
         language,
@@ -253,18 +263,18 @@ def create_audio_overview_task(
 def create_video_overview_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    video_format: str | None = None,
-    language: str | None = None,
-    visual_style: str | None = None,
-    custom_style_description: str | None = None,
-    focus_text: str | None = None,
+    profile: str,
+    video_format: Optional[str] = None,
+    language: Optional[str] = None,
+    visual_style: Optional[str] = None,
+    custom_style_description: Optional[str] = None,
+    focus_text: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create a video overview artifact."""
+    return _run_with_browser(
         create_video_overview,
+        headless,
+        profile,
         notebook_id,
         video_format,
         language,
@@ -278,16 +288,16 @@ def create_video_overview_task(
 def create_flashcards_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    card_count: str | None = None,
-    difficulty: str | None = None,
-    topic: str | None = None,
+    profile: str,
+    card_count: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create flashcards artifact."""
+    return _run_with_browser(
         create_flashcards,
+        headless,
+        profile,
         notebook_id,
         card_count,
         difficulty,
@@ -299,16 +309,16 @@ def create_flashcards_task(
 def create_quiz_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    question_count: str | None = None,
-    difficulty: str | None = None,
-    topic: str | None = None,
+    profile: str,
+    question_count: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create a quiz artifact."""
+    return _run_with_browser(
         create_quiz,
+        headless,
+        profile,
         notebook_id,
         question_count,
         difficulty,
@@ -320,17 +330,17 @@ def create_quiz_task(
 def create_infographic_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    language: str | None = None,
-    orientation: str | None = None,
-    detail_level: str | None = None,
-    description: str | None = None,
+    profile: str,
+    language: Optional[str] = None,
+    orientation: Optional[str] = None,
+    detail_level: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create an infographic artifact."""
+    return _run_with_browser(
         create_infographic,
+        headless,
+        profile,
         notebook_id,
         language,
         orientation,
@@ -343,17 +353,17 @@ def create_infographic_task(
 def create_slide_deck_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    format: str | None = None,
-    length: str | None = None,
-    language: str | None = None,
-    description: str | None = None,
+    profile: str,
+    format: Optional[str] = None,
+    length: Optional[str] = None,
+    language: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create a slide deck artifact."""
+    return _run_with_browser(
         create_slide_deck,
+        headless,
+        profile,
         notebook_id,
         format,
         length,
@@ -366,16 +376,16 @@ def create_slide_deck_task(
 def create_report_task(
     notebook_id: str,
     headless: bool,
-    user_profile_name: str,
-    format: str | None = None,
-    language: str | None = None,
-    description: str | None = None,
+    profile: str,
+    format: Optional[str] = None,
+    language: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return _run_in_sync_thread(
-        _run_with_browser,
-        headless,
-        user_profile_name,
+    """Create a report artifact."""
+    return _run_with_browser(
         create_report,
+        headless,
+        profile,
         notebook_id,
         format,
         language,
@@ -384,7 +394,6 @@ def create_report_task(
 
 
 @celery_app.task(name="notebooklm.create_mindmap")
-def create_mindmap_task(
-    notebook_id: str, headless: bool, user_profile_name: str
-) -> Dict[str, Any]:
-    return _run_in_sync_thread(_run_with_browser, headless, user_profile_name, create_mindmap, notebook_id)
+def create_mindmap_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+    """Create a mind map artifact."""
+    return _run_with_browser(create_mindmap, headless, profile, notebook_id)
