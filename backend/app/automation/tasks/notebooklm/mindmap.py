@@ -1,70 +1,40 @@
-"""Mind Map operations for NotebookLM automation."""
+"""Sync mind map creation for NotebookLM automation."""
 
-from typing import Dict, Optional
+import re
+from typing import Dict
 
-from playwright.async_api import Page
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Page
 
 from app.automation.tasks.notebooklm.exceptions import NotebookLMError
-from app.automation.tasks.notebooklm.helpers import close_dialogs, navigate_to_notebook
 
 
-async def create_mindmap(
-    page: Page,
-    notebook_id: str,
-) -> Dict[str, str]:
+def create_mindmap(page: Page, notebook_id: str) -> Dict[str, str]:
     """
-    Creates a mind map for a notebook in NotebookLM.
+    Create mind map artifact.
 
     Args:
-        page: The Playwright Page object to use for automation
-        notebook_id: The ID of the notebook to create mind map for
+        page: The Playwright Page object
+        notebook_id: The ID of the notebook
 
     Returns:
         Dictionary with status and message
 
     Raises:
-        NotebookLMError: If creating mind map fails
+        NotebookLMError: If mind map creation fails
     """
     try:
-        # Navigate directly to the notebook page
-        await navigate_to_notebook(page, notebook_id)
-
-        # Close any dialogs that might appear
-        await close_dialogs(page)
-
-        # Wait for the Mind Map button to be visible and click it
-        try:
-            mindmap_button = page.get_by_label("Mind Map")
-            await mindmap_button.wait_for(timeout=30_000, state="visible")
-            await mindmap_button.click()
-        except PlaywrightTimeoutError as exc:
-            raise NotebookLMError(
-                "Could not find the 'Mind Map' button. "
-                "The notebook page may not have loaded correctly."
-            ) from exc
-
-        # Wait for the generating message to appear
-        try:
-            generating_message = page.locator("artifact-library div").filter(
-                has_text="sync Generating Mind Map..."
-            )
-            await generating_message.wait_for(timeout=10_000, state="visible")
-        except PlaywrightTimeoutError as exc:
-            raise NotebookLMError(
-                "Could not confirm mind map generation started. "
-                "The 'Generating Mind Map...' message did not appear."
-            ) from exc
-
+        page.goto(f"https://notebooklm.google.com/notebook/{notebook_id}")
+        mind_button = page.get_by_role(
+            "button", name=re.compile("Mind map", re.IGNORECASE)
+        ).first
+        mind_button.wait_for(timeout=30_000, state="visible")
+        mind_button.click()
+        page.wait_for_timeout(2_000)
         return {
             "status": "success",
-            "message": f"Mind map creation started for notebook {notebook_id}. "
-            "The mind map is being generated and will be available in a few minutes.",
+            "message": f"Mind map creation started for {notebook_id}.",
         }
     except NotebookLMError:
         raise
     except Exception as exc:
-        raise NotebookLMError(
-            f"Failed to create mind map for NotebookLM notebook: {exc}"
-        ) from exc
-
+        raise NotebookLMError(f"Failed to create mind map: {exc}") from exc

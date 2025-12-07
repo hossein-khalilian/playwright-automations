@@ -5,31 +5,34 @@ Celery tasks for NotebookLM operations using sync Playwright.
 from typing import Any, Callable, Dict, Optional
 
 from app.automation.tasks.google_login import check_or_login_google_sync
-from app.automation.tasks.notebooklm.exceptions import NotebookLMError
-from app.automation.tasks.notebooklm.sync_flows import (
-    add_source_to_notebook,
-    create_audio_overview,
-    create_flashcards,
-    create_infographic,
-    create_mindmap,
-    create_notebook,
-    create_quiz,
-    create_report,
-    create_slide_deck,
-    create_video_overview,
+from app.automation.tasks.notebooklm.artifacts import (
     delete_artifact,
-    delete_chat_history,
-    delete_notebook,
-    delete_source,
     download_artifact,
-    get_chat_history,
     list_artifacts,
-    list_sources,
-    query_notebook,
     rename_artifact,
+)
+from app.automation.tasks.notebooklm.audio_overview import create_audio_overview
+from app.automation.tasks.notebooklm.chat import (
+    delete_chat_history,
+    get_chat_history,
+    query_notebook,
+)
+from app.automation.tasks.notebooklm.exceptions import NotebookLMError
+from app.automation.tasks.notebooklm.flashcards import create_flashcards
+from app.automation.tasks.notebooklm.infographic import create_infographic
+from app.automation.tasks.notebooklm.mindmap import create_mindmap
+from app.automation.tasks.notebooklm.notebooks import create_notebook, delete_notebook
+from app.automation.tasks.notebooklm.quiz import create_quiz
+from app.automation.tasks.notebooklm.report import create_report
+from app.automation.tasks.notebooklm.slide_deck import create_slide_deck
+from app.automation.tasks.notebooklm.sources import (
+    add_source_to_notebook,
+    delete_source,
+    list_sources,
     rename_source,
     review_source,
 )
+from app.automation.tasks.notebooklm.video_overview import create_video_overview
 from app.celery_app import celery_app
 from app.utils.browser_utils import initialize_page_sync
 
@@ -39,14 +42,14 @@ def _run_with_browser(
 ) -> Dict[str, Any]:
     """
     Helper function to initialize browser, ensure login, run flow, and clean up.
-    
+
     Args:
         flow_func: The sync flow function to execute (takes page as first arg)
         headless: Whether to run browser in headless mode
         profile: User profile name for browser
         *flow_args: Positional arguments to pass to flow_func after page
         **flow_kwargs: Keyword arguments to pass to flow_func
-    
+
     Returns:
         Dictionary with status and message from the flow function
     """
@@ -175,13 +178,17 @@ def query_notebook_task(
 
 
 @celery_app.task(name="notebooklm.get_chat_history")
-def get_chat_history_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+def get_chat_history_task(
+    notebook_id: str, headless: bool, profile: str
+) -> Dict[str, Any]:
     """Get chat history for a notebook."""
     return _run_with_browser(get_chat_history, headless, profile, notebook_id)
 
 
 @celery_app.task(name="notebooklm.delete_chat_history")
-def delete_chat_history_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+def delete_chat_history_task(
+    notebook_id: str, headless: bool, profile: str
+) -> Dict[str, Any]:
     """Delete chat history for a notebook."""
     return _run_with_browser(delete_chat_history, headless, profile, notebook_id)
 
@@ -192,7 +199,9 @@ def delete_chat_history_task(notebook_id: str, headless: bool, profile: str) -> 
 
 
 @celery_app.task(name="notebooklm.list_artifacts")
-def list_artifacts_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+def list_artifacts_task(
+    notebook_id: str, headless: bool, profile: str
+) -> Dict[str, Any]:
     """List all artifacts in a notebook."""
     return _run_with_browser(list_artifacts, headless, profile, notebook_id)
 
@@ -394,6 +403,8 @@ def create_report_task(
 
 
 @celery_app.task(name="notebooklm.create_mindmap")
-def create_mindmap_task(notebook_id: str, headless: bool, profile: str) -> Dict[str, Any]:
+def create_mindmap_task(
+    notebook_id: str, headless: bool, profile: str
+) -> Dict[str, Any]:
     """Create a mind map artifact."""
     return _run_with_browser(create_mindmap, headless, profile, notebook_id)
