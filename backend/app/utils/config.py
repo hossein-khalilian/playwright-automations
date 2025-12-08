@@ -22,6 +22,8 @@ config = {
     "MINIO_ROOT_USER": os.environ.get("MINIO_ROOT_USER"),
     "MINIO_ROOT_PASSWORD": os.environ.get("MINIO_ROOT_PASSWORD"),
     "MINIO_AUDIO_BUCKET": os.environ.get("MINIO_AUDIO_BUCKET"),
+    # configs
+    "BROWSER_POOL_SIZE": os.environ.get("BROWSER_POOL_SIZE"),
 }
 
 # Normalize keys to lowercase for easier access (existing behavior)
