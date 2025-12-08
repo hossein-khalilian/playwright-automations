@@ -2,6 +2,8 @@
 Celery tasks for NotebookLM operations using sync Playwright.
 """
 
+import logging
+import os
 from typing import Any, Callable, Dict, Optional
 
 from app.automation.tasks.google_login import check_or_login_google_sync
@@ -34,18 +36,26 @@ from app.automation.tasks.notebooklm.sources import (
 )
 from app.automation.tasks.notebooklm.video_overview import create_video_overview
 from app.celery_app import celery_app
+from app.utils.browser_state import (
+    get_page_from_pool,
+    return_page_to_pool,
+)
 from app.utils.browser_utils import initialize_page_sync
+from app.utils.config import config
+
+logger = logging.getLogger(__name__)
 
 
 def _run_with_browser(
     flow_func: Callable, headless: bool, profile: str, *flow_args, **flow_kwargs
 ) -> Dict[str, Any]:
     """
-    Helper function to initialize browser, ensure login, run flow, and clean up.
+    Helper function to get page from pool, run flow, and return page to pool.
+    Falls back to creating a new browser if pool is not available.
 
     Args:
         flow_func: The sync flow function to execute (takes page as first arg)
-        headless: Whether to run browser in headless mode
+        headless: Whether to run browser in headless mode (used for fallback)
         profile: User profile name for browser
         *flow_args: Positional arguments to pass to flow_func after page
         **flow_kwargs: Keyword arguments to pass to flow_func
@@ -56,15 +66,26 @@ def _run_with_browser(
     page = None
     context = None
     playwright = None
+    page_from_pool = False
 
     try:
-        # Initialize browser
-        page, context, playwright = initialize_page_sync(
-            headless=headless, user_profile_name=profile
-        )
-
-        # Ensure Google login
-        check_or_login_google_sync(page)
+        # Try to get a page from the pool first
+        page = get_page_from_pool()
+        
+        if page is not None:
+            logger.debug(f"Using page from pool for task")
+            page_from_pool = True
+        else:
+            # Fallback: create a new browser if pool is not available
+            logger.warning(
+                "No page available in pool, creating new browser instance. "
+                "Consider initializing browser pool in Celery worker."
+            )
+            page, context, playwright = initialize_page_sync(
+                headless=headless, user_profile_name=profile
+            )
+            # Ensure Google login for new browser
+            check_or_login_google_sync(page)
 
         # Run the flow function with the page and other args
         result = flow_func(page, *flow_args, **flow_kwargs)
@@ -76,22 +97,28 @@ def _run_with_browser(
             "message": str(exc),
         }
     except Exception as exc:
+        logger.error(f"Error in flow function: {exc}", exc_info=True)
         return {
             "status": "error",
             "message": f"Unexpected error: {exc}",
         }
     finally:
-        # Clean up browser resources
-        if context:
+        # Return page to pool if it came from pool, otherwise clean up
+        if page_from_pool and page is not None:
             try:
-                context.close()
-            except Exception:
-                pass
-        if playwright:
+                return_page_to_pool(page)
+                logger.debug("Returned page to pool")
+            except Exception as e:
+                logger.warning(f"Error returning page to pool: {e}")
+        elif context and playwright:
+            # Clean up browser resources for fallback browser
             try:
-                playwright.stop()
-            except Exception:
-                pass
+                if context:
+                    context.close()
+                if playwright:
+                    playwright.stop()
+            except Exception as e:
+                logger.warning(f"Error cleaning up browser: {e}")
 
 
 # ============================================================================
