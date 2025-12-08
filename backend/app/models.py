@@ -24,6 +24,10 @@ class GooglePagesStatusResponse(BaseModel):
     all_logged_in: bool = Field(
         description="Whether all pages are logged into Google"
     )
+    message: Optional[str] = Field(
+        None,
+        description="Additional information about the page pool status",
+    )
 
 
 class NotebookCreateResponse(BaseModel):
