@@ -30,10 +30,12 @@ services:
       sh -c '
       if [ "$PRODUCTION" = "false" ]; then
         watchmedo auto-restart --directory=./ --pattern="*.py" --recursive -- \
-          celery -A app.celery_app worker --loglevel=info --concurrency=1 --pool=solo;
+          celery -A app.celery_app worker --loglevel=info --concurrency=2;
       else
-        celery -A app.celery_app worker --loglevel=info --concurrency=1;
+        celery -A app.worker.celery_app worker --loglevel=info --concurrency=2;
       fi'
+    depends_on:
+      - redis
     networks:
       - shared_net
     volumes:
@@ -41,23 +43,23 @@ services:
       - ./browser_profiles:/browser_profiles
 
   flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: mher/flower
     env_file:
       - .env
     restart: unless-stopped
     command: >
-      celery -A app.worker.celery_app flower
-             --port=5555
+      celery --broker=${CELERY_BROKER_URL} flower --port=5555
     ports:
       - "${FLOWER_PORT}:5555"
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - shared_net
     depends_on:
       - worker
+    networks:
+      - shared_net
+
+  redis:
+    image: redis:latest
+    networks:
+      - shared_net
 
   frontend:
     build:
