@@ -3,7 +3,6 @@ Celery tasks for NotebookLM operations using sync Playwright.
 """
 
 import logging
-import os
 from typing import Any, Callable, Dict, Optional
 
 from app.automation.tasks.google_login import check_or_login_google_sync
@@ -36,12 +35,8 @@ from app.automation.tasks.notebooklm.sources import (
 )
 from app.automation.tasks.notebooklm.video_overview import create_video_overview
 from app.celery_app import celery_app
-from app.utils.browser_state import (
-    get_page_from_pool,
-    return_page_to_pool,
-)
+from app.utils.browser_state import get_page_from_pool, return_page_to_pool
 from app.utils.browser_utils import initialize_page_sync
-from app.utils.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +66,7 @@ def _run_with_browser(
     try:
         # Try to get a page from the pool first
         page = get_page_from_pool()
-        
+
         if page is not None:
             logger.debug(f"Using page from pool for task")
             page_from_pool = True
