@@ -7,23 +7,6 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.auth import CurrentUser
 from app.celery_app import celery_app
-from app.models import (
-    ArtifactRenameRequest,
-    AudioOverviewCreateRequest,
-    FlashcardCreateRequest,
-    InfographicCreateRequest,
-    MindmapCreateRequest,
-    Notebook,
-    NotebookListResponse,
-    NotebookQueryRequest,
-    QuizCreateRequest,
-    ReportCreateRequest,
-    SlideDeckCreateRequest,
-    SourceRenameRequest,
-    TaskStatusResponse,
-    TaskSubmissionResponse,
-    VideoOverviewCreateRequest,
-)
 from app.celery_tasks.notebooklm import (
     add_source_task,
     create_audio_overview_task,
@@ -47,6 +30,23 @@ from app.celery_tasks.notebooklm import (
     rename_artifact_task,
     rename_source_task,
     review_source_task,
+)
+from app.models import (
+    ArtifactRenameRequest,
+    AudioOverviewCreateRequest,
+    FlashcardCreateRequest,
+    InfographicCreateRequest,
+    MindmapCreateRequest,
+    Notebook,
+    NotebookListResponse,
+    NotebookQueryRequest,
+    QuizCreateRequest,
+    ReportCreateRequest,
+    SlideDeckCreateRequest,
+    SourceRenameRequest,
+    TaskStatusResponse,
+    TaskSubmissionResponse,
+    VideoOverviewCreateRequest,
 )
 from app.utils.db import get_notebooks_by_user
 
@@ -101,15 +101,14 @@ def _task_status(task_id: str) -> TaskStatusResponse:
 # Notebooks
 # ============================================================================
 
+
 @router.get(
     "/notebooks",
     response_model=NotebookListResponse,
     status_code=status.HTTP_200_OK,
     tags=["Notebooks"],
 )
-async def list_notebooks_endpoint(
-    current_user: CurrentUser
-) -> NotebookListResponse:
+async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResponse:
     """
     List all notebooks for the current user.
     Returns notebooks directly from MongoDB without using Celery.

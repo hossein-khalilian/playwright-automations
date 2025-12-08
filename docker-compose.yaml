@@ -19,6 +19,7 @@ services:
     volumes:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
+      - shared_tmp:/tmp
 
   worker:
     build:
@@ -41,6 +42,7 @@ services:
     volumes:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
+      - shared_tmp:/tmp
 
   flower:
     image: mher/flower
@@ -83,3 +85,6 @@ services:
 networks:
   shared_net:
     external: true
+
+volumes:
+  shared_tmp:
