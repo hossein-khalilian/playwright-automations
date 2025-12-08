@@ -19,6 +19,20 @@ export interface RegisterResponse {
   username: string;
 }
 
+// Task / Celery types
+export interface TaskSubmissionResponse {
+  task_id: string;
+  status: string;
+}
+
+export interface TaskStatusResponse<T = any> {
+  task_id: string;
+  state: string;
+  status: 'pending' | 'success' | 'failure' | string;
+  message?: string;
+  result?: T;
+}
+
 // Notebook types
 export interface Notebook {
   notebook_id: string;
@@ -34,6 +48,7 @@ export interface NotebookCreateResponse {
   status: string;
   message: string;
   notebook_url?: string;
+  notebook_id?: string;
 }
 
 // Source types

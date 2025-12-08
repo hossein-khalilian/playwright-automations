@@ -23,6 +23,7 @@ export default function ArtifactManager({
   const [creating, setCreating] = useState(false);
   const [createType, setCreateType] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const handleDelete = async (artifactName: string) => {
     if (!confirm(`Are you sure you want to delete "${artifactName}"?`)) {
@@ -32,10 +33,13 @@ export default function ArtifactManager({
     try {
       setDeleting(artifactName);
       setError('');
-      await artifactApi.delete(notebookId, artifactName);
+      setInfo('');
+      const status = await artifactApi.delete(notebookId, artifactName);
+      setInfo(status.message || 'Delete submitted.');
       await onArtifactsChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete artifact';
+      const errorMessage =
+        err.response?.data?.detail || err.message || 'Failed to delete artifact';
       setError(errorMessage);
       console.error('Delete artifact error:', err);
     } finally {
@@ -47,17 +51,12 @@ export default function ArtifactManager({
     try {
       setDownloading(artifactName);
       setError('');
-      const blob = await artifactApi.download(notebookId, artifactName);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = artifactName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setInfo('');
+      const status = await artifactApi.download(notebookId, artifactName);
+      setInfo(status.message || 'Download triggered.');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to download artifact';
+      const errorMessage =
+        err.response?.data?.detail || err.message || 'Failed to download artifact';
       setError(errorMessage);
       console.error('Download error:', err);
     } finally {
@@ -93,6 +92,11 @@ export default function ArtifactManager({
       {error && (
         <div className="rounded-md bg-red-50 p-4">
           <div className="text-sm text-red-800">{error}</div>
+        </div>
+      )}
+      {info && !error && (
+        <div className="rounded-md bg-blue-50 p-4">
+          <div className="text-sm text-blue-800">{info}</div>
         </div>
       )}
 

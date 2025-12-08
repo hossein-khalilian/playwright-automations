@@ -37,10 +37,22 @@ export default function SourceReviewModal({
       try {
         setLoading(true);
         setError('');
-        const response = await sourceApi.review(notebookId, sourceName);
-        setData(response);
+        const status = await sourceApi.review(notebookId, sourceName);
+        if (status.result) {
+          setData(status.result);
+        } else if (status.message) {
+          setData({
+            status: 'info',
+            message: status.message,
+            key_topics: [],
+            images: [],
+          });
+        } else {
+          setError('Review completed but no details were returned.');
+        }
       } catch (err: any) {
-        const errorMessage = err.response?.data?.detail || err.message || 'Failed to load source review';
+        const errorMessage =
+          err.response?.data?.detail || err.message || 'Failed to load source review';
         setError(errorMessage);
         console.error('Review error:', err);
       } finally {
@@ -86,6 +98,11 @@ export default function SourceReviewModal({
                 className="space-y-4 max-h-[70vh] overflow-y-auto"
                 dir={contentRTL || 'ltr'}
               >
+                {data.message && (
+                  <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+                    {data.message}
+                  </div>
+                )}
                 {data.title && (
                   <div>
                     <h4 className="font-semibold text-gray-900">Title</h4>

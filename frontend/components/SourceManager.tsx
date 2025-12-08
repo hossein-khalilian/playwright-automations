@@ -24,6 +24,7 @@ export default function SourceManager({
   const [newName, setNewName] = useState('');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -32,7 +33,9 @@ export default function SourceManager({
     try {
       setUploading(true);
       setError('');
-      await sourceApi.upload(notebookId, file);
+      setInfo('');
+      const status = await sourceApi.upload(notebookId, file);
+      setInfo(status.message || 'Upload submitted. Processing...');
       e.target.value = ''; // Reset input
       // Small delay before reloading to allow processing
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -55,7 +58,9 @@ export default function SourceManager({
     try {
       setDeleting(sourceName);
       setError('');
-      await sourceApi.delete(notebookId, sourceName);
+      setInfo('');
+      const status = await sourceApi.delete(notebookId, sourceName);
+      setInfo(status.message || 'Delete submitted.');
       await onSourcesChange();
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete source';
@@ -74,7 +79,9 @@ export default function SourceManager({
 
     try {
       setError('');
-      await sourceApi.rename(notebookId, sourceName, newName.trim());
+      setInfo('');
+      const status = await sourceApi.rename(notebookId, sourceName, newName.trim());
+      setInfo(status.message || 'Rename submitted.');
       setRenaming(null);
       setNewName('');
       await onSourcesChange();
@@ -101,6 +108,11 @@ export default function SourceManager({
       {error && (
         <div className="rounded-md bg-red-50 p-4">
           <div className="text-sm text-red-800">{error}</div>
+        </div>
+      )}
+      {info && !error && (
+        <div className="rounded-md bg-blue-50 p-4">
+          <div className="text-sm text-blue-800">{info}</div>
         </div>
       )}
 

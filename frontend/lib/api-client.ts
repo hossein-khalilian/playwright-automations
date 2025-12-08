@@ -1,38 +1,97 @@
 import api from './api';
 import { retryWithBackoff } from './retry';
 import type {
-  LoginRequest,
-  RegisterRequest,
-  Token,
-  RegisterResponse,
-  NotebookListResponse,
-  NotebookCreateResponse,
-  SourceListResponse,
-  SourceUploadResponse,
-  SourceReviewResponse,
-  SourceRenameRequest,
-  ChatHistoryResponse,
-  NotebookQueryRequest,
-  NotebookQueryResponse,
   ArtifactListResponse,
   AudioOverviewCreateRequest,
-  AudioOverviewCreateResponse,
-  VideoOverviewCreateRequest,
-  VideoOverviewCreateResponse,
+  ChatHistoryResponse,
   FlashcardCreateRequest,
-  FlashcardCreateResponse,
-  QuizCreateRequest,
-  QuizCreateResponse,
-  InfographicCreateRequest,
-  InfographicCreateResponse,
-  SlideDeckCreateRequest,
-  SlideDeckCreateResponse,
-  ReportCreateRequest,
-  ReportCreateResponse,
-  MindmapCreateRequest,
-  MindmapCreateResponse,
   GoogleLoginStatusResponse,
+  InfographicCreateRequest,
+  LoginRequest,
+  MindmapCreateRequest,
+  NotebookCreateResponse,
+  NotebookListResponse,
+  NotebookQueryRequest,
+  NotebookQueryResponse,
+  QuizCreateRequest,
+  RegisterRequest,
+  RegisterResponse,
+  ReportCreateRequest,
+  SlideDeckCreateRequest,
+  SourceListResponse,
+  SourceRenameRequest,
+  SourceUploadResponse,
+  Token,
+  VideoOverviewCreateRequest,
+  AudioOverviewCreateResponse,
+  VideoOverviewCreateResponse,
+  FlashcardCreateResponse,
+  QuizCreateResponse,
+  InfographicCreateResponse,
+  SlideDeckCreateResponse,
+  ReportCreateResponse,
+  MindmapCreateResponse,
+  SourceReviewResponse,
+  TaskSubmissionResponse,
+  TaskStatusResponse,
 } from './types';
+
+type TaskWaitOptions = {
+  pollIntervalMs?: number;
+  maxAttempts?: number;
+};
+
+const DEFAULT_TASK_OPTIONS: Required<TaskWaitOptions> = {
+  pollIntervalMs: 2000,
+  maxAttempts: 120,
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const ensureResult = <T>(status: TaskStatusResponse<T>): T => {
+  if (status.result !== undefined && status.result !== null) {
+    return status.result as T;
+  }
+  throw new Error(status.message || 'Task completed without a result payload.');
+};
+
+async function waitForTaskResult<T = any>(
+  taskId: string,
+  options: TaskWaitOptions = {}
+): Promise<TaskStatusResponse<T>> {
+  const { pollIntervalMs, maxAttempts } = { ...DEFAULT_TASK_OPTIONS, ...options };
+  let lastStatus: TaskStatusResponse<T> | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data } = await api.get<TaskStatusResponse<T>>(`/notebooklm/tasks/${taskId}`);
+    lastStatus = data;
+
+    if (data.status === 'success') {
+      return data;
+    }
+
+    if (data.status === 'failure') {
+      throw new Error(data.message || 'Task failed');
+    }
+
+    await sleep(pollIntervalMs);
+  }
+
+  throw new Error(
+    lastStatus?.message || 'Task is still pending. Please try again in a moment.'
+  );
+}
+
+async function submitTask<T = any>(
+  submitFn: () => Promise<TaskSubmissionResponse>,
+  options?: TaskWaitOptions
+): Promise<TaskStatusResponse<T>> {
+  const submission = await submitFn();
+  if (!submission?.task_id) {
+    throw new Error('Task submission did not return a task_id');
+  }
+  return waitForTaskResult<T>(submission.task_id, options);
+}
 
 // Auth API
 export const authApi = {
@@ -59,240 +118,284 @@ export const notebookApi = {
     return response.data;
   },
 
-  create: async (): Promise<NotebookCreateResponse> => {
-    const response = await api.post<NotebookCreateResponse>('/notebooklm/notebooks');
-    return response.data;
+  create: async (): Promise<TaskStatusResponse<NotebookCreateResponse>> => {
+    return submitTask<NotebookCreateResponse>(
+      () => api.post<TaskSubmissionResponse>('/notebooklm/notebooks').then((res) => res.data)
+    );
   },
 
-  delete: async (notebookId: string): Promise<{ status: string; message: string }> => {
-    const response = await api.delete(`/notebooklm/notebooks/${notebookId}`);
-    return response.data;
+  delete: async (
+    notebookId: string
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(
+      () =>
+        api
+          .delete<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}`)
+          .then((res) => res.data)
+    );
   },
 };
 
 // Source API
 export const sourceApi = {
   list: async (notebookId: string): Promise<SourceListResponse> => {
-    return retryWithBackoff(async () => {
-      const response = await api.get<SourceListResponse>(
-        `/notebooklm/notebooks/${notebookId}/sources`
-      );
-      return response.data;
-    });
+    const status = await retryWithBackoff(() =>
+      submitTask<SourceListResponse>(() =>
+        api
+          .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/sources`)
+          .then((res) => res.data)
+      )
+    );
+    return ensureResult(status);
   },
 
-  upload: async (
-    notebookId: string,
-    file: File
-  ): Promise<SourceUploadResponse> => {
+  upload: async (notebookId: string, file: File): Promise<TaskStatusResponse<SourceUploadResponse>> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post<SourceUploadResponse>(
-      `/notebooklm/notebooks/${notebookId}/sources`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+    return submitTask<SourceUploadResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/sources/upload`,
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }
+        )
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   delete: async (
     notebookId: string,
     sourceName: string
-  ): Promise<{ status: string; message: string }> => {
-    const response = await api.delete(
-      `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}`
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .delete<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}`
+        )
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   rename: async (
     notebookId: string,
     sourceName: string,
     newName: string
-  ): Promise<{ status: string; message: string }> => {
-    const response = await api.put(
-      `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/rename`,
-      { new_name: newName } as SourceRenameRequest
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/rename`,
+          { new_name: newName } as SourceRenameRequest
+        )
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
-  review: async (notebookId: string, sourceName: string): Promise<SourceReviewResponse> => {
-    return retryWithBackoff(async () => {
-      const response = await api.get<SourceReviewResponse>(
-        `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/review`
-      );
-      return response.data;
-    });
+  review: async (
+    notebookId: string,
+    sourceName: string
+  ): Promise<TaskStatusResponse<SourceReviewResponse>> => {
+    return submitTask<SourceReviewResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/review`
+        )
+        .then((res) => res.data)
+    );
   },
 };
 
 // Chat API
 export const chatApi = {
   getHistory: async (notebookId: string): Promise<ChatHistoryResponse> => {
-    return retryWithBackoff(async () => {
-      const response = await api.get<ChatHistoryResponse>(
-        `/notebooklm/notebooks/${notebookId}/chat`
-      );
-      return response.data;
-    });
+    const status = await retryWithBackoff(() =>
+      submitTask<ChatHistoryResponse>(() =>
+        api
+          .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/chat`)
+          .then((res) => res.data)
+      )
+    );
+    return ensureResult(status);
   },
 
   query: async (
     notebookId: string,
     query: string
-  ): Promise<NotebookQueryResponse> => {
-    return retryWithBackoff(async () => {
-      const response = await api.post<NotebookQueryResponse>(
-        `/notebooklm/notebooks/${notebookId}/query`,
-        { query } as NotebookQueryRequest
-      );
-      return response.data;
-    }, {
-      maxRetries: 2, // Fewer retries for user-initiated actions
-      initialDelay: 2000, // Longer initial delay for queries
-    });
+  ): Promise<TaskStatusResponse<NotebookQueryResponse>> => {
+    return submitTask<NotebookQueryResponse>(
+      () =>
+        api
+          .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/query`, {
+            query,
+          } as NotebookQueryRequest)
+          .then((res) => res.data),
+      {
+        pollIntervalMs: 2000,
+        maxAttempts: 80,
+      }
+    );
   },
 
-  deleteHistory: async (notebookId: string): Promise<{ status: string; message: string }> => {
-    const response = await api.delete(`/notebooklm/notebooks/${notebookId}/chat`);
-    return response.data;
+  deleteHistory: async (
+    notebookId: string
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .delete<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/chat`)
+        .then((res) => res.data)
+    );
   },
 };
 
 // Artifact API
 export const artifactApi = {
   list: async (notebookId: string): Promise<ArtifactListResponse> => {
-    return retryWithBackoff(async () => {
-      const response = await api.get<ArtifactListResponse>(
-        `/notebooklm/notebooks/${notebookId}/artifacts`
-      );
-      return response.data;
-    });
+    const status = await retryWithBackoff(() =>
+      submitTask<ArtifactListResponse>(() =>
+        api
+          .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/artifacts`)
+          .then((res) => res.data)
+      )
+    );
+    const result = ensureResult(status);
+    return {
+      ...result,
+      artifacts: (result.artifacts || []).map((artifact: any) => ({
+        is_generating: Boolean(artifact.is_generating),
+        ...artifact,
+      })),
+    };
   },
 
   delete: async (
     notebookId: string,
     artifactName: string
-  ): Promise<{ status: string; message: string }> => {
-    const response = await api.delete(
-      `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}`
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .delete<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}`
+        )
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   rename: async (
     notebookId: string,
     artifactName: string,
     newName: string
-  ): Promise<{ status: string; message: string }> => {
-    const response = await api.put(
-      `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/rename`,
-      { new_name: newName }
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/rename`,
+          { new_name: newName }
+        )
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
-  download: async (notebookId: string, artifactName: string): Promise<Blob> => {
-    return retryWithBackoff(async () => {
-      const response = await api.get(
-        `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/download`,
-        { responseType: 'blob' }
-      );
-      return response.data;
-    });
+  download: async (
+    notebookId: string,
+    artifactName: string
+  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
+    return submitTask(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/download`
+        )
+        .then((res) => res.data)
+    );
   },
 
   createAudioOverview: async (
     notebookId: string,
     data: AudioOverviewCreateRequest
-  ): Promise<AudioOverviewCreateResponse> => {
-    const response = await api.post<AudioOverviewCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/audio-overview`,
-      data
+  ): Promise<TaskStatusResponse<AudioOverviewCreateResponse>> => {
+    return submitTask<AudioOverviewCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/audio_overview`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createVideoOverview: async (
     notebookId: string,
     data: VideoOverviewCreateRequest
-  ): Promise<VideoOverviewCreateResponse> => {
-    const response = await api.post<VideoOverviewCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/video-overview`,
-      data
+  ): Promise<TaskStatusResponse<VideoOverviewCreateResponse>> => {
+    return submitTask<VideoOverviewCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/video_overview`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createFlashcards: async (
     notebookId: string,
     data: FlashcardCreateRequest
-  ): Promise<FlashcardCreateResponse> => {
-    const response = await api.post<FlashcardCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/flashcards`,
-      data
+  ): Promise<TaskStatusResponse<FlashcardCreateResponse>> => {
+    return submitTask<FlashcardCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/flashcards`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createQuiz: async (
     notebookId: string,
     data: QuizCreateRequest
-  ): Promise<QuizCreateResponse> => {
-    const response = await api.post<QuizCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/quiz`,
-      data
+  ): Promise<TaskStatusResponse<QuizCreateResponse>> => {
+    return submitTask<QuizCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/quiz`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createInfographic: async (
     notebookId: string,
     data: InfographicCreateRequest
-  ): Promise<InfographicCreateResponse> => {
-    const response = await api.post<InfographicCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/infographic`,
-      data
+  ): Promise<TaskStatusResponse<InfographicCreateResponse>> => {
+    return submitTask<InfographicCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/infographic`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createSlideDeck: async (
     notebookId: string,
     data: SlideDeckCreateRequest
-  ): Promise<SlideDeckCreateResponse> => {
-    const response = await api.post<SlideDeckCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/slide-deck`,
-      data
+  ): Promise<TaskStatusResponse<SlideDeckCreateResponse>> => {
+    return submitTask<SlideDeckCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/slide_deck`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createReport: async (
     notebookId: string,
     data: ReportCreateRequest
-  ): Promise<ReportCreateResponse> => {
-    const response = await api.post<ReportCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/report`,
-      data
+  ): Promise<TaskStatusResponse<ReportCreateResponse>> => {
+    return submitTask<ReportCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/report`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 
   createMindmap: async (
     notebookId: string,
     data: MindmapCreateRequest
-  ): Promise<MindmapCreateResponse> => {
-    const response = await api.post<MindmapCreateResponse>(
-      `/notebooklm/notebooks/${notebookId}/mindmap`,
-      data
+  ): Promise<TaskStatusResponse<MindmapCreateResponse>> => {
+    return submitTask<MindmapCreateResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/mindmap`, data)
+        .then((res) => res.data)
     );
-    return response.data;
   },
 };
 

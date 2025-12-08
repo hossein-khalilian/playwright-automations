@@ -15,6 +15,7 @@ export default function NotebooksPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -43,13 +44,13 @@ export default function NotebooksPage() {
     try {
       setCreating(true);
       setError('');
-      const response = await notebookApi.create();
-      if (response.notebook_url) {
-        // Extract notebook_id from URL or reload list
-        await loadNotebooks();
-      }
+      setInfo('');
+      const status = await notebookApi.create();
+      setInfo(status.message || 'Notebook creation submitted.');
+      await loadNotebooks();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create notebook');
+      const message = err.response?.data?.detail || err.message || 'Failed to create notebook';
+      setError(message);
     } finally {
       setCreating(false);
     }
@@ -61,10 +62,13 @@ export default function NotebooksPage() {
     }
 
     try {
-      await notebookApi.delete(notebookId);
+      setInfo('');
+      const status = await notebookApi.delete(notebookId);
+      setInfo(status.message || 'Notebook deletion submitted.');
       await loadNotebooks();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete notebook');
+      const message = err.response?.data?.detail || err.message || 'Failed to delete notebook';
+      setError(message);
     }
   };
 
@@ -101,6 +105,11 @@ export default function NotebooksPage() {
           {error && (
             <div className="mb-4 rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-800">{error}</div>
+            </div>
+          )}
+          {info && !error && (
+            <div className="mb-4 rounded-md bg-blue-50 p-4">
+              <div className="text-sm text-blue-800">{info}</div>
             </div>
           )}
 
