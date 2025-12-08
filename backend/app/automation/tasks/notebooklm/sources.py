@@ -33,14 +33,32 @@ def add_source_to_notebook(
         add_source_button.wait_for(timeout=10_000)
         add_source_button.click()
         page.wait_for_timeout(500)
-        choose_file_button = page.get_by_role("button", name="choose file")
-        choose_file_button.wait_for(timeout=5_000)
-        choose_file_button.click()
-        page.wait_for_timeout(1_000)
+        
+        # Check if dialog appears (only shows if no sources exist)
         dialog = page.locator('[id^="mat-mdc-dialog-"]').last
-        dialog.wait_for(timeout=10_000)
-        file_input = dialog.locator('input[type="file"]').first
-        file_input.wait_for(timeout=3_000, state="attached")
+        dialog_appeared = False
+        try:
+            dialog.wait_for(timeout=3_000, state="visible")
+            dialog_appeared = True
+        except Exception:
+            # Dialog didn't appear - sources might already exist
+            pass
+        
+        if dialog_appeared:
+            # Dialog appeared - use the "choose file" button flow
+            choose_file_button = page.get_by_role("button", name="choose file")
+            choose_file_button.wait_for(timeout=5_000)
+            choose_file_button.click()
+            page.wait_for_timeout(1_000)
+            # Wait for dialog to be ready and find file input within it
+            dialog.wait_for(timeout=5_000)
+            file_input = dialog.locator('input[type="file"]')
+            file_input.wait_for(timeout=5_000, state="attached")
+        else:
+            # Dialog didn't appear - look for file input directly on page
+            file_input = page.locator('input[type="file"]')
+            file_input.wait_for(timeout=5_000, state="attached")
+        
         file_input.set_input_files(file_path)
         page.wait_for_timeout(2_000)
         return {
@@ -145,12 +163,14 @@ def delete_source(page: Page, notebook_id: str, source_name: str) -> Dict[str, s
         actions_button.wait_for(timeout=5_000)
         actions_button.click()
         page.wait_for_timeout(500)
-        delete_button = page.get_by_role("menuitem", name="Delete")
+        delete_button = page.get_by_role(
+            "menuitem", name=re.compile("Remove source", re.IGNORECASE)
+        )
         delete_button.wait_for(timeout=5_000)
         delete_button.click()
         page.wait_for_timeout(500)
         confirm_button = page.get_by_role(
-            "button", name=re.compile("Delete", re.IGNORECASE)
+            "button", name=re.compile("Confirm deletion", re.IGNORECASE)
         )
         confirm_button.wait_for(timeout=5_000)
         confirm_button.click()
@@ -194,17 +214,17 @@ def rename_source(
         actions_button.click()
         page.wait_for_timeout(500)
         rename_button = page.get_by_role(
-            "menuitem", name=re.compile("Rename", re.IGNORECASE)
+            "menuitem", name=re.compile("Rename source", re.IGNORECASE)
         )
         rename_button.wait_for(timeout=5_000)
         rename_button.click()
         page.wait_for_timeout(500)
-        name_input = page.get_by_role("textbox").first
+        name_input = page.get_by_role("textbox", name="Source Name")
         name_input.wait_for(timeout=5_000)
+        name_input.click()
+        name_input.press("ControlOrMeta+a")
         name_input.fill(new_name)
-        save_button = page.get_by_role(
-            "button", name=re.compile("Save|Rename", re.IGNORECASE)
-        )
+        save_button = page.get_by_role("button", name="Save")
         save_button.wait_for(timeout=5_000)
         save_button.click()
         page.wait_for_timeout(1_000)
