@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -87,6 +87,10 @@ class TaskStatusResponse(BaseModel):
     status: str = Field(description="High-level task status (pending/success/failure)")
     message: Optional[str] = Field(
         None, description="Additional detail about the current task state"
+    )
+    result: Optional[Any] = Field(
+        None,
+        description="Full task result payload when available (e.g. listings, messages)",
     )
 
 

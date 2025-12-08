@@ -71,21 +71,29 @@ def _task_status(task_id: str) -> TaskStatusResponse:
     state = res.state
     status_txt = "pending"
     message = None
+    result_payload = None
+
     if state == "SUCCESS":
         status_txt = "success"
-        result = res.result
-        if isinstance(result, dict) and "message" in result:
-            message = result.get("message")
+        result_payload = res.result
+        if isinstance(result_payload, dict) and "message" in result_payload:
+            message = result_payload.get("message")
         else:
-            message = str(result)
+            message = str(result_payload)
     elif state in {"FAILURE", "REVOKED"}:
         status_txt = "failure"
         try:
-            message = str(res.result)
+            result_payload = res.result
+            message = str(result_payload)
         except Exception:
             message = None
+
     return TaskStatusResponse(
-        task_id=task_id, state=state, status=status_txt, message=message
+        task_id=task_id,
+        state=state,
+        status=status_txt,
+        message=message,
+        result=result_payload if status_txt == "success" else None,
     )
 
 
