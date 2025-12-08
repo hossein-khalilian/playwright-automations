@@ -28,3 +28,12 @@ config = {
 
 # Normalize keys to lowercase for easier access (existing behavior)
 config = {key.lower(): value for key, value in config.items()}
+# Convert browser_pool_size to int, default to 1 if not set
+browser_pool_size = config.get("browser_pool_size")
+if browser_pool_size:
+    try:
+        config["browser_pool_size"] = int(browser_pool_size)
+    except (ValueError, TypeError):
+        config["browser_pool_size"] = 1
+else:
+    config["browser_pool_size"] = 1

@@ -9,6 +9,23 @@ class GoogleLoginStatusResponse(BaseModel):
     is_logged_in: bool = Field(description="Whether Google is currently logged in")
 
 
+class PageLoginStatus(BaseModel):
+    page_index: int = Field(description="Index of the page in the pool (0-based)")
+    is_logged_in: bool = Field(description="Whether this page is logged into Google")
+    is_closed: bool = Field(description="Whether this page is closed")
+    error: Optional[str] = Field(None, description="Error message if checking status failed")
+
+
+class GooglePagesStatusResponse(BaseModel):
+    total_pages: int = Field(description="Total number of pages in the pool")
+    pages_status: List[PageLoginStatus] = Field(
+        description="Login status of each page in the pool"
+    )
+    all_logged_in: bool = Field(
+        description="Whether all pages are logged into Google"
+    )
+
+
 class NotebookCreateResponse(BaseModel):
     status: str = Field(description="Status of the notebook creation")
     message: str = Field(description="Message describing the result")
