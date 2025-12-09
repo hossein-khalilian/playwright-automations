@@ -121,12 +121,36 @@ export default function ArtifactManager({
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Artifacts</h2>
-            {loading && (
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
-                <span>Loading...</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              {loading && (
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
+                  <span>Loading...</span>
+                </div>
+              )}
+              <button
+                onClick={onArtifactsChange}
+                disabled={loading}
+                className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
+                title="Reload artifacts"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                <span>Reload</span>
+              </button>
+            </div>
           </div>
         </div>
         {loading && artifacts.length === 0 ? (
