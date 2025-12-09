@@ -24,7 +24,15 @@ export default function NotebookDetailPage() {
   const params = useParams();
   const notebookId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<'sources' | 'chat' | 'artifacts'>('sources');
+  const [activeTab, setActiveTab] = useState<'sources' | 'chat' | 'artifacts'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`notebook-active-tab-${params.id as string}`);
+      if (stored === 'sources' || stored === 'chat' || stored === 'artifacts') {
+        return stored;
+      }
+    }
+    return 'sources';
+  });
   const [sources, setSources] = useState<Source[]>([]);
   const [artifacts, setArtifacts] = useState<ArtifactInfo[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -41,6 +49,12 @@ export default function NotebookDetailPage() {
       return;
     }
   }, [isAuthenticated, authLoading, router]);
+
+  // Persist active tab per notebook to localStorage
+  useEffect(() => {
+    if (!notebookId) return;
+    localStorage.setItem(`notebook-active-tab-${notebookId}`, activeTab);
+  }, [notebookId, activeTab]);
 
   const loadSources = async () => {
     try {

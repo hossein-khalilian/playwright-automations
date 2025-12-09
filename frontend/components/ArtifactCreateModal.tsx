@@ -49,11 +49,20 @@ export default function ArtifactCreateModal({
   const [infographicLanguage, setInfographicLanguage] = useState<string>('english');
   const [orientation, setOrientation] = useState<string>('Landscape');
   const [detailLevel, setDetailLevel] = useState<string>('Standard');
-  const [reportFormat, setReportFormat] = useState<string>('');
+  // Report defaults: Create Your Own, English
+  const [reportFormat, setReportFormat] = useState<string>('Create Your Own');
   const [reportLanguage, setReportLanguage] = useState<string>('english');
   const [focusText, setFocusText] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
+
+  // Default descriptions for report formats
+  const reportFormatDefaults: Record<string, string> = {
+    'Briefing Doc': 'Create a comprehensive briefing document that synthesizes the main themes and ideas from the sources. Start with a concise Executive Summary that presents the most critical takeaways upfront. The body of the document must provide a detailed and thorough examination of the main themes, evidence, and conclusions found in the sources. This analysis should be structured logically with headings and bullet points to ensure clarity. The tone must be objective and incisive.',
+    'Study Guide': 'You are a highly capable research assistant and tutor. Create a detailed study guide designed to review understanding of the sources. Create a quiz with ten short-answer questions (2-3 sentences each) and include a separate answer key. Suggest five essay format questions, but do not supply answers. Also conclude with a comprehensive glossary of key terms with definitions.',
+    'Blog Post': 'Act as a thoughtful writer and synthesizer of ideas, tasked with creating an engaging and readable blog post for a popular online publishing platform known for its clean aesthetic and insightful content. Your goal is to distill the top most surprising, counter-intuitive, or impactful takeaways from the provided source materials into a compelling listicle. The writing style should be clean, accessible, and highly scannable, employing a conversational yet intelligent tone. Craft a compelling, click-worthy headline. Begin the article with a short introduction that hooks the reader by establishing a relatable problem or curiosity, then present each of the takeaway points as a distinct section with a clear, bolded subheading. Within each section, use short paragraphs to explain the concept clearly, and don\'t just summarize; offer a brief analysis or a reflection on why this point is so interesting or important, and if a powerful quote exists in the sources, feature it in a blockquote for emphasis. Conclude the post with a brief, forward-looking summary that leaves the reader with a final thought-provoking question or a powerful takeaway to ponder.',
+    'Create Your Own': '',
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,10 +132,21 @@ export default function ArtifactCreateModal({
           break;
         }
         case 'report': {
+          // For "Create Your Own", description is mandatory
+          if (reportFormat === 'Create Your Own' && !description.trim()) {
+            setError('Description is required for "Create Your Own" format');
+            setLoading(false);
+            return;
+          }
+          // For other formats, use default description if empty
+          let finalDescription = description;
+          if (reportFormat && reportFormat !== 'Create Your Own' && !description.trim()) {
+            finalDescription = reportFormatDefaults[reportFormat] || description;
+          }
           const data: ReportCreateRequest = {
             format: reportFormat || undefined,
             language: reportLanguage || undefined,
-            description: description || undefined,
+            description: finalDescription || undefined,
           };
           await artifactApi.createReport(notebookId, data);
           break;
@@ -810,37 +830,88 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Format</label>
-              <select
-                value={reportFormat}
-                onChange={(e) => setReportFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Create Your Own">Create Your Own</option>
-                <option value="Briefing Doc">Briefing Doc</option>
-                <option value="Study Guide">Study Guide</option>
-                <option value="Blog Post">Blog Post</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'Create Your Own', title: 'Create Your Own', description: 'Craft reports your way by specifying structure, style, tone, and more' },
+                  { value: 'Briefing Doc', title: 'Briefing Doc', description: 'Overview of your sources featuring key insights and quotes' },
+                  { value: 'Study Guide', title: 'Study Guide', description: 'Short-answer quiz, suggested essay questions, and glossary of key terms' },
+                  { value: 'Blog Post', title: 'Blog Post', description: 'Insightful takeaways distilled into a highly readable article' },
+                  { value: 'Design Document', title: 'Design Document', description: 'A technical document comparing data models for a new data-intensive application.' },
+                  { value: 'Strategy Memo', title: 'Strategy Memo', description: 'A memo outlining a strategy for evolving a system to a distributed architecture.' },
+                  { value: 'Concept Explainer', title: 'Concept Explainer', description: 'Learn the essential principles for building strong and lasting data applications.' },
+                  { value: 'Comparative Overview', title: 'Comparative Overview', description: 'Discover the main differences between how databases store and organize information.' },
+                ].map((format) => (
+                  <label
+                    key={format.value}
+                    className={`flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      reportFormat === format.value
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="reportFormat"
+                      value={format.value}
+                      checked={reportFormat === format.value}
+                      onChange={(e) => {
+                        const newFormat = e.target.value;
+                        setReportFormat(newFormat);
+                        // Auto-populate default description when format changes
+                        if (reportFormatDefaults[newFormat]) {
+                          setDescription(reportFormatDefaults[newFormat]);
+                        } else {
+                          setDescription('');
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-gray-900">{format.title}</div>
+                      {reportFormat === format.value && (
+                        <span className="text-xs text-indigo-700 font-semibold">Selected</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600 mt-2">{format.description}</div>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Language</label>
-              <select
-                value={reportLanguage}
-                onChange={(e) => setReportLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="english">English</option>
-                <option value="persian">Persian</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <select
+                  value={reportLanguage}
+                  onChange={(e) => setReportLanguage(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
+                >
+                  <option value="english">English (default)</option>
+                  <option value="persian">Persian</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Describe the report you want to create
+                {reportFormat === 'Create Your Own' && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              {reportFormat !== 'Create Your Own' && reportFormatDefaults[reportFormat] && (
+                <p className="text-xs text-gray-500 mb-2">
+                  Default description is pre-filled. You can edit it if needed.
+                </p>
+              )}
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={3}
+                rows={reportFormat === 'Create Your Own' ? 4 : 6}
                 maxLength={5000}
+                required={reportFormat === 'Create Your Own'}
+                placeholder={
+                  reportFormat === 'Create Your Own'
+                    ? 'For example:\n\nCreate a formal competitive review of the 2026 functional beverage market for a new wellness drink. The tone should be analytical and strategic, focusing on the distribution and pricing of key competitors to inform our launch strategy.'
+                    : 'Edit the default description or use as-is.'
+                }
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
