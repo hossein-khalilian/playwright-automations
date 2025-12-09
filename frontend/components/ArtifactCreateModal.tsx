@@ -34,11 +34,14 @@ export default function ArtifactCreateModal({
   const [length, setLength] = useState<string>('');
   const [visualStyle, setVisualStyle] = useState<string>('');
   const [customStyleDescription, setCustomStyleDescription] = useState('');
-  const [cardCount, setCardCount] = useState<string>('');
-  const [questionCount, setQuestionCount] = useState<string>('');
-  const [difficulty, setDifficulty] = useState<string>('');
-  const [orientation, setOrientation] = useState<string>('');
-  const [detailLevel, setDetailLevel] = useState<string>('');
+  // Defaults: Standard for count, Medium for difficulty
+  const [cardCount, setCardCount] = useState<string>('Standard');
+  const [questionCount, setQuestionCount] = useState<string>('Standard');
+  const [difficulty, setDifficulty] = useState<string>('Medium');
+  // Defaults: English, Landscape, Standard
+  const [infographicLanguage, setInfographicLanguage] = useState<string>('english');
+  const [orientation, setOrientation] = useState<string>('Landscape');
+  const [detailLevel, setDetailLevel] = useState<string>('Standard');
   const [slideDeckFormat, setSlideDeckFormat] = useState<string>('');
   const [slideDeckLength, setSlideDeckLength] = useState<string>('');
   const [reportFormat, setReportFormat] = useState<string>('');
@@ -55,8 +58,8 @@ export default function ArtifactCreateModal({
       switch (artifactType) {
         case 'audio-overview': {
           const data: AudioOverviewCreateRequest = {
-            audio_format: audioFormat as any,
-            language: language as any,
+            audio_format: audioFormat || undefined,
+            language: language || undefined,
             length: length || undefined,
             focus_text: focusText || undefined,
           };
@@ -65,9 +68,9 @@ export default function ArtifactCreateModal({
         }
         case 'video-overview': {
           const data: VideoOverviewCreateRequest = {
-            video_format: videoFormat as any,
-            language: language as any,
-            visual_style: visualStyle as any,
+            video_format: videoFormat || undefined,
+            language: language || undefined,
+            visual_style: visualStyle || undefined,
             custom_style_description: customStyleDescription || undefined,
             focus_text: focusText || undefined,
           };
@@ -76,8 +79,8 @@ export default function ArtifactCreateModal({
         }
         case 'flashcards': {
           const data: FlashcardCreateRequest = {
-            card_count: cardCount as any,
-            difficulty: difficulty as any,
+            card_count: cardCount ? (cardCount as any) : undefined,
+            difficulty: difficulty ? (difficulty as any) : undefined,
             topic: topic || undefined,
           };
           await artifactApi.createFlashcards(notebookId, data);
@@ -85,8 +88,8 @@ export default function ArtifactCreateModal({
         }
         case 'quiz': {
           const data: QuizCreateRequest = {
-            question_count: questionCount as any,
-            difficulty: difficulty as any,
+            question_count: questionCount ? (questionCount as any) : undefined,
+            difficulty: difficulty ? (difficulty as any) : undefined,
             topic: topic || undefined,
           };
           await artifactApi.createQuiz(notebookId, data);
@@ -94,9 +97,9 @@ export default function ArtifactCreateModal({
         }
         case 'infographic': {
           const data: InfographicCreateRequest = {
-            language: language as any,
-            orientation: orientation as any,
-            detail_level: detailLevel as any,
+            language: infographicLanguage ? (infographicLanguage as any) : undefined,
+            orientation: orientation ? (orientation as any) : undefined,
+            detail_level: detailLevel ? (detailLevel as any) : undefined,
             description: description || undefined,
           };
           await artifactApi.createInfographic(notebookId, data);
@@ -104,9 +107,9 @@ export default function ArtifactCreateModal({
         }
         case 'slide-deck': {
           const data: SlideDeckCreateRequest = {
-            format: slideDeckFormat as any,
-            length: slideDeckLength as any,
-            language: language as any,
+            format: slideDeckFormat || undefined,
+            length: slideDeckLength || undefined,
+            language: language || undefined,
             description: description || undefined,
           };
           await artifactApi.createSlideDeck(notebookId, data);
@@ -114,8 +117,8 @@ export default function ArtifactCreateModal({
         }
         case 'report': {
           const data: ReportCreateRequest = {
-            format: reportFormat as any,
-            language: language as any,
+            format: reportFormat || undefined,
+            language: language || undefined,
             description: description || undefined,
           };
           await artifactApi.createReport(notebookId, data);
@@ -129,7 +132,32 @@ export default function ArtifactCreateModal({
       }
       onClose();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to create artifact';
+      // Handle FastAPI validation errors which come as an array of error objects
+      let errorMessage = 'Failed to create artifact';
+      
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        
+        // Check if detail is an array (validation errors)
+        if (Array.isArray(detail)) {
+          // Format validation errors into a readable message
+          errorMessage = detail
+            .map((error: any) => {
+              const field = error.loc?.slice(1).join('.') || 'field';
+              return `${field}: ${error.msg}`;
+            })
+            .join('; ');
+        } else if (typeof detail === 'string') {
+          // Simple string error
+          errorMessage = detail;
+        } else {
+          // Try to stringify if it's an object
+          errorMessage = JSON.stringify(detail);
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       console.error('Create artifact error:', err);
     } finally {
@@ -288,39 +316,96 @@ export default function ArtifactCreateModal({
       case 'flashcards':
         return (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Card Count</label>
-              <select
-                value={cardCount}
-                onChange={(e) => setCardCount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Fewer">Fewer</option>
-                <option value="Standard">Standard</option>
-                <option value="More">More</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Cards</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCardCount('Fewer')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      cardCount === 'Fewer'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Fewer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardCount('Standard')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      cardCount === 'Standard'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Standard (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardCount('More')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      cardCount === 'More'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    More
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Level of Difficulty</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Easy')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Easy'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Easy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Medium')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Medium'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Medium (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Hard')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Hard'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Hard
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Difficulty</label>
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Easy">Easy</option>
-                <option value="Medium">Medium</option>
-                <option value="Hard">Hard</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Topic (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">What should the topic be?</label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder={`Things to try
+
+ • The flashcards must be restricted to a specific source (e.g. "the article about Italy")
+ • The flashcards must focus on a specific topic like "Newton's second law"
+ • The card fronts must be short (1-5 words) for memorization`}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -330,39 +415,96 @@ export default function ArtifactCreateModal({
       case 'quiz':
         return (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Question Count</label>
-              <select
-                value={questionCount}
-                onChange={(e) => setQuestionCount(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Fewer">Fewer</option>
-                <option value="Standard">Standard</option>
-                <option value="More">More</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Questions</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount('Fewer')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      questionCount === 'Fewer'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Fewer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount('Standard')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      questionCount === 'Standard'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Standard (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount('More')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      questionCount === 'More'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    More
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Level of Difficulty</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Easy')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Easy'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Easy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Medium')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Medium'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Medium (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty('Hard')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      difficulty === 'Hard'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Hard
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Difficulty</label>
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Easy">Easy</option>
-                <option value="Medium">Medium</option>
-                <option value="Hard">Hard</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Topic (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">What should the topic be?</label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder={`Things to try
+
+ • The quiz must be restricted to a specific source (e.g. "the article about Italy")
+ • The quiz must focus solely on the key concepts of physics
+ • Create a quiz to help me prepare for my history exam on Ancient Egypt`}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -372,51 +514,103 @@ export default function ArtifactCreateModal({
       case 'infographic':
         return (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Language</label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="english">English</option>
-                <option value="persian">Persian</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <select
+                  value={infographicLanguage}
+                  onChange={(e) => setInfographicLanguage(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
+                >
+                  <option value="english">English</option>
+                  <option value="persian">Persian</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose orientation</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOrientation('Landscape')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      orientation === 'Landscape'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Landscape
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrientation('Portrait')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      orientation === 'Portrait'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Portrait
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrientation('Square')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      orientation === 'Square'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Square
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Orientation</label>
-              <select
-                value={orientation}
-                onChange={(e) => setOrientation(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Landscape">Landscape</option>
-                <option value="Portrait">Portrait</option>
-                <option value="Square">Square</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Level of detail</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailLevel('Concise')}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    detailLevel === 'Concise'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Concise
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailLevel('Standard')}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    detailLevel === 'Standard'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailLevel('Detailed BETA')}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    detailLevel === 'Detailed BETA'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Detailed <span className="text-xs">BETA</span>
+                </button>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Detail Level</label>
-              <select
-                value={detailLevel}
-                onChange={(e) => setDetailLevel(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Concise">Concise</option>
-                <option value="Standard">Standard</option>
-                <option value="Detailed BETA">Detailed BETA</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Describe the infographic you want to create</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder='Guide the style, color, or focus: "Use a blue color theme and highlight the 3 key stats."'
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
