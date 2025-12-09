@@ -130,21 +130,20 @@ def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[st
         navigate_to_notebook(page, notebook_id)
         close_dialogs(page)
         artifact_library = _artifact_library(page)
-        artifact_button = (
+        # Find the artifact container (item or note) that contains the artifact
+        artifact_container = (
             artifact_library.locator(
-                "artifact-library-item button.artifact-button-content, artifact-library-note button.artifact-button-content"
+                "artifact-library-item, artifact-library-note"
             )
             .filter(has_text=artifact_name)
             .first
         )
-        artifact_button.wait_for(timeout=10_000)
-        artifact_button.click()
-        page.wait_for_timeout(500)
-        actions_button = page.get_by_role(
-            "button", name=re.compile("More|Actions", re.IGNORECASE)
-        ).first
-        actions_button.wait_for(timeout=5_000)
-        actions_button.click()
+        artifact_container.wait_for(timeout=10_000)
+        # Find the "More" button within the artifact container
+        # The More button is a sibling of the artifact button, so we search within the container
+        more_button = artifact_container.get_by_label("More")
+        more_button.wait_for(timeout=5_000)
+        more_button.click()
         page.wait_for_timeout(300)
         delete_button = page.get_by_role(
             "menuitem", name=re.compile("Delete", re.IGNORECASE)
@@ -153,7 +152,7 @@ def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[st
         delete_button.click()
         page.wait_for_timeout(500)
         confirm_button = page.get_by_role(
-            "button", name=re.compile("Delete|Confirm", re.IGNORECASE)
+            "button", name="Confirm deletion"
         )
         confirm_button.wait_for(timeout=5_000)
         confirm_button.click()
