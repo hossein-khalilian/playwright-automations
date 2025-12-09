@@ -134,13 +134,17 @@ class SourceImageInfo(BaseModel):
 class SourceReviewResponse(BaseModel):
     status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")
-    title: Optional[str] = Field(None, description="Title/name of the source")
+    source_name: Optional[str] = Field(None, description="Name of the source")
+    title: Optional[str] = Field(None, description="Title/name of the source (alias for source_name)")
     summary: Optional[str] = Field(None, description="Summary of the source content")
     key_topics: List[str] = Field(
         default_factory=list, description="List of key topics extracted from the source"
     )
     content: Optional[str] = Field(
         None, description="Full content/transcript of the source"
+    )
+    markdown: Optional[str] = Field(
+        None, description="Complete source review in markdown format"
     )
     images: List[SourceImageInfo] = Field(
         default_factory=list, description="List of images found in the source"
