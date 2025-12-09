@@ -28,12 +28,19 @@ export default function ArtifactCreateModal({
   const [error, setError] = useState('');
 
   // Form state based on artifact type
-  const [audioFormat, setAudioFormat] = useState<string>('');
-  const [videoFormat, setVideoFormat] = useState<string>('');
-  const [language, setLanguage] = useState<string>('');
-  const [length, setLength] = useState<string>('');
-  const [visualStyle, setVisualStyle] = useState<string>('');
+  // Audio defaults: Deep Dive, English, Default length
+  const [audioFormat, setAudioFormat] = useState<string>('Deep Dive');
+  const [audioLanguage, setAudioLanguage] = useState<string>('english');
+  const [audioLength, setAudioLength] = useState<string>('Default');
+  // Video defaults: Explainer, English, Auto-select
+  const [videoFormat, setVideoFormat] = useState<string>('Explainer');
+  const [videoLanguage, setVideoLanguage] = useState<string>('english');
+  const [visualStyle, setVisualStyle] = useState<string>('Auto-select');
   const [customStyleDescription, setCustomStyleDescription] = useState('');
+  // Slide deck defaults: Detailed Deck, English, Default length
+  const [slideDeckFormat, setSlideDeckFormat] = useState<string>('Detailed Deck');
+  const [slideDeckLanguage, setSlideDeckLanguage] = useState<string>('english');
+  const [slideDeckLength, setSlideDeckLength] = useState<string>('Default');
   // Defaults: Standard for count, Medium for difficulty
   const [cardCount, setCardCount] = useState<string>('Standard');
   const [questionCount, setQuestionCount] = useState<string>('Standard');
@@ -42,9 +49,8 @@ export default function ArtifactCreateModal({
   const [infographicLanguage, setInfographicLanguage] = useState<string>('english');
   const [orientation, setOrientation] = useState<string>('Landscape');
   const [detailLevel, setDetailLevel] = useState<string>('Standard');
-  const [slideDeckFormat, setSlideDeckFormat] = useState<string>('');
-  const [slideDeckLength, setSlideDeckLength] = useState<string>('');
   const [reportFormat, setReportFormat] = useState<string>('');
+  const [reportLanguage, setReportLanguage] = useState<string>('english');
   const [focusText, setFocusText] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
@@ -58,9 +64,10 @@ export default function ArtifactCreateModal({
       switch (artifactType) {
         case 'audio-overview': {
           const data: AudioOverviewCreateRequest = {
-            audio_format: audioFormat || undefined,
-            language: language || undefined,
-            length: length || undefined,
+            audio_format: audioFormat ? (audioFormat as any) : undefined,
+            language: audioLanguage ? (audioLanguage as any) : undefined,
+            // Brief format doesn't support length
+            length: audioFormat === 'Brief' ? undefined : (audioLength ? (audioLength as any) : undefined),
             focus_text: focusText || undefined,
           };
           await artifactApi.createAudioOverview(notebookId, data);
@@ -68,9 +75,9 @@ export default function ArtifactCreateModal({
         }
         case 'video-overview': {
           const data: VideoOverviewCreateRequest = {
-            video_format: videoFormat || undefined,
-            language: language || undefined,
-            visual_style: visualStyle || undefined,
+            video_format: videoFormat ? (videoFormat as any) : undefined,
+            language: videoLanguage ? (videoLanguage as any) : undefined,
+            visual_style: visualStyle ? (visualStyle as any) : undefined,
             custom_style_description: customStyleDescription || undefined,
             focus_text: focusText || undefined,
           };
@@ -107,9 +114,9 @@ export default function ArtifactCreateModal({
         }
         case 'slide-deck': {
           const data: SlideDeckCreateRequest = {
-            format: slideDeckFormat || undefined,
-            length: slideDeckLength || undefined,
-            language: language || undefined,
+            format: slideDeckFormat ? (slideDeckFormat as any) : undefined,
+            length: slideDeckLength ? (slideDeckLength as any) : undefined,
+            language: slideDeckLanguage ? (slideDeckLanguage as any) : undefined,
             description: description || undefined,
           };
           await artifactApi.createSlideDeck(notebookId, data);
@@ -118,7 +125,7 @@ export default function ArtifactCreateModal({
         case 'report': {
           const data: ReportCreateRequest = {
             format: reportFormat || undefined,
-            language: language || undefined,
+            language: reportLanguage || undefined,
             description: description || undefined,
           };
           await artifactApi.createReport(notebookId, data);
@@ -171,67 +178,133 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Audio Format</label>
-              <select
-                value={audioFormat}
-                onChange={(e) => setAudioFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Deep Dive">Deep Dive</option>
-                <option value="Brief">Brief</option>
-                <option value="Critique">Critique</option>
-                <option value="Debate">Debate</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <div className="space-y-3">
+                {[
+                  { value: 'Deep Dive', label: 'Deep Dive', description: 'A lively conversation between two hosts, unpacking and connecting topics in your sources' },
+                  { value: 'Brief', label: 'Brief', description: 'A bite-sized overview to help you grasp the core ideas from your sources quickly' },
+                  { value: 'Critique', label: 'Critique', description: 'An expert review of your sources, offering constructive feedback to help you improve your material' },
+                  { value: 'Debate', label: 'Debate', description: 'A thoughtful debate between two hosts, illuminating different perspectives on your sources' },
+                ].map((format) => (
+                  <label
+                    key={format.value}
+                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      audioFormat === format.value
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="audioFormat"
+                      value={format.value}
+                      checked={audioFormat === format.value}
+                      onChange={(e) => setAudioFormat(e.target.value)}
+                      className="mt-1 mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{format.label}</div>
+                      <div className="text-sm text-gray-600 mt-1">{format.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Language</label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="english">English</option>
-                <option value="persian">Persian</option>
-              </select>
-            </div>
-            {audioFormat === 'Deep Dive' && (
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Length</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
                 <select
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
+                  value={audioLanguage}
+                  onChange={(e) => setAudioLanguage(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
-                  <option value="">Default</option>
-                  <option value="Short">Short</option>
-                  <option value="Default">Default</option>
-                  <option value="Long">Long</option>
+                  <option value="english">English</option>
+                  <option value="persian">Persian</option>
                 </select>
               </div>
-            )}
-            {(audioFormat === 'Critique' || audioFormat === 'Debate') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Length</label>
-                <select
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-                >
-                  <option value="">Default</option>
-                  <option value="Short">Short</option>
-                  <option value="Default">Default</option>
-                </select>
-              </div>
-            )}
+              {audioFormat === 'Deep Dive' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAudioLength('Short')}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        audioLength === 'Short'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Short
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAudioLength('Default')}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        audioLength === 'Default'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Default
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAudioLength('Long')}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        audioLength === 'Long'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Long
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(audioFormat === 'Critique' || audioFormat === 'Debate') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAudioLength('Short')}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        audioLength === 'Short'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Short
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAudioLength('Default')}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                        audioLength === 'Default'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Default
+                    </button>
+                  </div>
+                </div>
+              )}
+              {audioFormat === 'Brief' && <div></div>}
+            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Focus Text (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">What should the AI hosts focus on in this episode?</label>
               <textarea
                 value={focusText}
                 onChange={(e) => setFocusText(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder={`Things to try
+
+ • Focus on a specific source ("only cover the article about Italy")
+ • Focus on a specific topic ("just discuss the novel's main character")
+ • Target a specific audience ("explain to someone new to biology")`}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -242,52 +315,75 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Video Format</label>
-              <select
-                value={videoFormat}
-                onChange={(e) => setVideoFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Explainer">Explainer</option>
-                <option value="Brief">Brief</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'Explainer', label: 'Explainer', description: 'A structured, comprehensive overview that connects the dots within your sources' },
+                  { value: 'Brief', label: 'Brief', description: 'A bite-sized overview to help you quickly grasp core ideas from your sources' },
+                ].map((format) => (
+                  <label
+                    key={format.value}
+                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      videoFormat === format.value
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="videoFormat"
+                      value={format.value}
+                      checked={videoFormat === format.value}
+                      onChange={(e) => setVideoFormat(e.target.value)}
+                      className="mt-1 mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{format.label}</div>
+                      <div className="text-sm text-gray-600 mt-1">{format.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Language</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
               <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                value={videoLanguage}
+                onChange={(e) => setVideoLanguage(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
-                <option value="">Default</option>
                 <option value="english">English</option>
                 <option value="persian">Persian</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Visual Style</label>
-              <select
-                value={visualStyle}
-                onChange={(e) => setVisualStyle(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Auto-select">Auto-select</option>
-                <option value="Custom">Custom</option>
-                <option value="Classic">Classic</option>
-                <option value="Whiteboard">Whiteboard</option>
-                <option value="Kawaii">Kawaii</option>
-                <option value="Anime">Anime</option>
-                <option value="Watercolor">Watercolor</option>
-                <option value="Retro print">Retro print</option>
-                <option value="Heritage">Heritage</option>
-                <option value="Paper-craft">Paper-craft</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Choose visual style</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['Auto-select', 'Custom', 'Classic', 'Whiteboard', 'Kawaii', 'Anime', 'Watercolor', 'Retro print', 'Heritage', 'Paper-craft'].map((style) => (
+                  <label
+                    key={style}
+                    className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      visualStyle === style
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="visualStyle"
+                      value={style}
+                      checked={visualStyle === style}
+                      onChange={(e) => setVisualStyle(e.target.value)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-gray-700">{style}</span>
+                  </label>
+                ))}
+              </div>
             </div>
             {visualStyle === 'Custom' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Custom Style Description (required)
                 </label>
                 <textarea
@@ -301,12 +397,17 @@ export default function ArtifactCreateModal({
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Focus Text (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">What should the AI hosts focus on?</label>
               <textarea
                 value={focusText}
                 onChange={(e) => setFocusText(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder={`Things to try
+
+ • Target a specific use case ("present this to a book club", "help me review for a quiz")
+ • Focus on a specific source ("show the photos from the album", "focus on the biology paper")
+ • Describe the show structure ("start by talking about the mission", "end with next steps")`}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -621,48 +722,84 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Format</label>
-              <select
-                value={slideDeckFormat}
-                onChange={(e) => setSlideDeckFormat(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Detailed Deck">Detailed Deck</option>
-                <option value="Presenter Slides">Presenter Slides</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'Detailed Deck', label: 'Detailed Deck', description: 'A comprehensive deck with full text and details, perfect for emailing or reading on its own.' },
+                  { value: 'Presenter Slides', label: 'Presenter Slides', description: 'Clean, visual slides with key talking points to support you while you speak.' },
+                ].map((format) => (
+                  <label
+                    key={format.value}
+                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      slideDeckFormat === format.value
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="slideDeckFormat"
+                      value={format.value}
+                      checked={slideDeckFormat === format.value}
+                      onChange={(e) => setSlideDeckFormat(e.target.value)}
+                      className="mt-1 mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{format.label}</div>
+                      <div className="text-sm text-gray-600 mt-1">{format.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <select
+                  value={slideDeckLanguage}
+                  onChange={(e) => setSlideDeckLanguage(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
+                >
+                  <option value="english">English</option>
+                  <option value="persian">Persian</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSlideDeckLength('Short')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      slideDeckLength === 'Short'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Short
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlideDeckLength('Default')}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      slideDeckLength === 'Default'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Default
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Length</label>
-              <select
-                value={slideDeckLength}
-                onChange={(e) => setSlideDeckLength(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="Short">Short</option>
-                <option value="Default">Default</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Language</label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
-              >
-                <option value="">Default</option>
-                <option value="english">English</option>
-                <option value="persian">Persian</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Describe the slide deck you want to create</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={5000}
+                placeholder={`Add a high-level outline, or guide the audience, style, and focus: "Create a deck for beginners using a bold and playful style with a focus on step-by-step instructions."`}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -689,11 +826,10 @@ export default function ArtifactCreateModal({
             <div>
               <label className="block text-sm font-medium text-gray-700">Language</label>
               <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                value={reportLanguage}
+                onChange={(e) => setReportLanguage(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
-                <option value="">Default</option>
                 <option value="english">English</option>
                 <option value="persian">Persian</option>
               </select>
