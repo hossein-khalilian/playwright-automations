@@ -50,7 +50,9 @@ def list_artifacts(page: Page, notebook_id: str) -> Dict[str, Any]:
         close_dialogs(page)
         artifact_library = _artifact_library(page)
         artifacts: List[Dict[str, Any]] = []
-        artifact_items = artifact_library.locator("artifact-library-item")
+        
+        # Get both artifact-library-item and artifact-library-note elements
+        artifact_items = artifact_library.locator("artifact-library-item, artifact-library-note")
         for i in range(artifact_items.count()):
             try:
                 artifact_item = artifact_items.nth(i)
@@ -130,7 +132,7 @@ def delete_artifact(page: Page, notebook_id: str, artifact_name: str) -> Dict[st
         artifact_library = _artifact_library(page)
         artifact_button = (
             artifact_library.locator(
-                "artifact-library-item button.artifact-button-content"
+                "artifact-library-item button.artifact-button-content, artifact-library-note button.artifact-button-content"
             )
             .filter(has_text=artifact_name)
             .first
@@ -187,7 +189,7 @@ def rename_artifact(
         artifact_library = _artifact_library(page)
         artifact_button = (
             artifact_library.locator(
-                "artifact-library-item button.artifact-button-content"
+                "artifact-library-item button.artifact-button-content, artifact-library-note button.artifact-button-content"
             )
             .filter(has_text=artifact_name)
             .first
@@ -246,7 +248,7 @@ def download_artifact(
         artifact_library = _artifact_library(page)
         artifact_button = (
             artifact_library.locator(
-                "artifact-library-item button.artifact-button-content"
+                "artifact-library-item button.artifact-button-content, artifact-library-note button.artifact-button-content"
             )
             .filter(has_text=artifact_name)
             .first
