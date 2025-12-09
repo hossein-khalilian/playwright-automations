@@ -38,12 +38,61 @@ export default function ChatInterface({
     try {
       setSending(true);
       setError('');
-      await chatApi.query(notebookId, query);
+      
+      // Store the current message count before sending
+      const previousMessageCount = messages.length;
+      const sentQuery = query;
+      
+      // Send the query
+      await chatApi.query(notebookId, sentQuery);
       setQuery('');
-      // Reload messages after a short delay to allow processing
-      setTimeout(() => {
+      
+      // Initial delay before starting to poll (give the query time to be processed)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Poll for new messages to appear in chat history
+      // We'll check if:
+      // 1. The message count has increased (new user message appeared)
+      // 2. The last message is from assistant (AI response has been generated)
+      const maxAttempts = 30; // Maximum polling attempts (30 * 2s = 60 seconds)
+      const pollInterval = 2000; // Poll every 2 seconds
+      
+      let foundCompleteResponse = false;
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          // Fetch chat history directly to check for new messages
+          const response = await chatApi.getHistory(notebookId);
+          const newMessages = response.messages;
+          
+          // Check if we have new messages
+          if (newMessages.length > previousMessageCount) {
+            // Check if the last message is from assistant (AI response ready)
+            const lastMessage = newMessages[newMessages.length - 1];
+            if (lastMessage.role === 'assistant') {
+              // Both user message and AI response are ready
+              foundCompleteResponse = true;
+              // Sync with parent component
+              onMessagesChange();
+              break;
+            }
+            // If we have new messages but AI response isn't ready yet, continue polling
+          }
+        } catch (pollErr) {
+          // If polling fails, log but continue
+          console.warn('Error polling chat history:', pollErr);
+        }
+        
+        // Wait before next poll attempt
+        if (attempt < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+      }
+      
+      // Final update to ensure we have the latest messages (even if AI response isn't ready)
+      if (!foundCompleteResponse) {
         onMessagesChange();
-      }, 1000);
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to send query';
       setError(errorMessage);
