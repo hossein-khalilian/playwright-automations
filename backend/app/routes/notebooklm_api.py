@@ -390,14 +390,18 @@ def download_artifact_endpoint(
     download_path = result["download_path"]
     suggested_filename = result.get("filename", f"{artifact_name}.png")
     
-    # Ensure filename has an extension
+    # Use the suggested filename from the download (it should already have the correct extension)
     filename = suggested_filename
+    
+    # Only add extension if missing, and try to detect from actual file first
     if not Path(filename).suffix:
-        # If no extension, try to detect from actual file or default to .png
+        # If no extension, try to detect from actual file
         actual_file_ext = Path(download_path).suffix
         if actual_file_ext:
             filename = f"{filename}{actual_file_ext}"
         else:
+            # Default based on artifact type if we can't detect
+            # But prefer to use the suggested filename which should have the extension
             filename = f"{filename}.png"
     
     # Check if file exists
@@ -417,12 +421,19 @@ def download_artifact_endpoint(
         ".mp4": "video/mp4",
         ".mp3": "audio/mpeg",
         ".json": "application/json",
+        ".csv": "text/csv",
+        ".txt": "text/plain",
+        ".html": "text/html",
+        ".xml": "application/xml",
     }
     media_type = media_types.get(file_ext, "application/octet-stream")
     
     # Clean filename for safe header usage
     # Remove any path components and ensure it's a valid filename
     safe_filename = os.path.basename(filename)
+    
+    # Preserve the file extension
+    file_ext = Path(safe_filename).suffix
     
     # Create ASCII-safe filename for Content-Disposition header
     # HTTP headers must be encodable in latin-1
@@ -433,11 +444,14 @@ def download_artifact_endpoint(
     except UnicodeEncodeError:
         # Filename contains non-latin-1 characters
         # Create ASCII version by removing/replacing non-ASCII characters
-        header_filename = safe_filename.encode('ascii', 'ignore').decode('ascii')
-        if not header_filename or not header_filename.strip():
-            # If filename becomes empty, use artifact name with extension
-            file_ext = Path(safe_filename).suffix or '.png'
-            header_filename = f"{artifact_name}{file_ext}"
+        # But preserve the extension
+        base_name = Path(safe_filename).stem
+        ascii_base = base_name.encode('ascii', 'ignore').decode('ascii')
+        if not ascii_base or not ascii_base.strip():
+            # If base name becomes empty, use artifact name
+            ascii_base = artifact_name
+        # Always preserve the original extension
+        header_filename = f"{ascii_base}{file_ext}" if file_ext else f"{ascii_base}.png"
     
     # Build Content-Disposition header
     # For Unicode filenames, we'll rely on the filename parameter of FileResponse

@@ -336,6 +336,46 @@ def download_artifact(
             # Close the popup
             popup.close()
             page.wait_for_timeout(500)
+        elif artifact_type == "flashcards":
+            # Handle flashcard downloads: open artifact, expand, then download from iframe dialog
+            # Click the artifact button to open it
+            artifact_button = page.get_by_role("button", name=artifact_name).first
+            artifact_button.wait_for(timeout=10_000, state="visible")
+            artifact_button.click()
+            page.wait_for_timeout(1_000)
+            
+            # Click "Expand" button
+            expand_button = page.get_by_role(
+                "button", name=re.compile("Expand", re.IGNORECASE)
+            )
+            expand_button.wait_for(timeout=10_000, state="visible")
+            expand_button.click()
+            page.wait_for_timeout(1_000)
+            
+            # Wait for dialog and iframe to appear, then click Download button inside iframe
+            with page.expect_download(timeout=30_000) as download_info:
+                # Wait for dialog to appear
+                dialog = page.get_by_role("dialog")
+                dialog.wait_for(timeout=10_000, state="visible")
+                page.wait_for_timeout(500)
+                
+                # Get the iframe inside the dialog and access its content frame
+                iframe_locator = dialog.locator("iframe")
+                iframe_locator.wait_for(timeout=10_000, state="attached")
+                
+                # In Playwright Python sync API, use frame_locator to interact with iframe content
+                # We need to scope it to the dialog's iframe
+                # Use page.frame_locator with a selector that finds the iframe in the dialog
+                frame_locator = page.frame_locator('dialog iframe, [role="dialog"] iframe')
+                
+                # Click Download button inside the iframe
+                download_button = frame_locator.get_by_role(
+                    "button", name=re.compile("Download", re.IGNORECASE)
+                )
+                download_button.wait_for(timeout=5_000, state="visible")
+                download_button.click()
+            download = download_info.value
+            page.wait_for_timeout(500)
         else:
             # Handle video/audio downloads (and others that trigger popup from menu)
             # Find the menu trigger button (More button) within the artifact container

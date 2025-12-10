@@ -348,9 +348,11 @@ export const artifactApi = {
     
     // Ensure filename has an extension
     if (!filename.includes('.')) {
-      // Try to get extension from Content-Type or default to .png
+      // Try to get extension from Content-Type or default based on type
       const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
-      if (contentType.includes('png')) {
+      if (contentType.includes('csv') || contentType.includes('text/csv')) {
+        filename = `${filename}.csv`;
+      } else if (contentType.includes('png')) {
         filename = `${filename}.png`;
       } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
         filename = `${filename}.jpg`;
@@ -360,6 +362,10 @@ export const artifactApi = {
         filename = `${filename}.mp4`;
       } else if (contentType.includes('mpeg') || contentType.includes('mp3')) {
         filename = `${filename}.mp3`;
+      } else if (contentType.includes('json')) {
+        filename = `${filename}.json`;
+      } else if (contentType.includes('text/plain')) {
+        filename = `${filename}.txt`;
       } else {
         filename = `${filename}.png`; // Default to PNG for images
       }
