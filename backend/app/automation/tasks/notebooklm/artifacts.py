@@ -1,7 +1,7 @@
 """Sync artifact management operations for NotebookLM automation."""
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -224,11 +224,44 @@ def rename_artifact(
         raise NotebookLMError(f"Failed to rename artifact: {exc}") from exc
 
 
+def _get_artifact_type(page: Page, artifact_container) -> Optional[str]:
+    """
+    Get the type of an artifact by checking its icon.
+
+    Args:
+        page: The Playwright Page object
+        artifact_container: The artifact container locator
+
+    Returns:
+        The artifact type string or None if not found
+    """
+    try:
+        icon_element = artifact_container.locator("mat-icon.artifact-icon").first
+        if icon_element.count() > 0:
+            # Use inner_text() method like in sources.py
+            icon_text = icon_element.inner_text().strip()
+            if icon_text:
+                # Match icon text to artifact type
+                for icon_name, type_name in ICON_TO_TYPE.items():
+                    if icon_name in icon_text:
+                        return type_name
+                # Return the icon text if no match found
+                return icon_text
+    except Exception:
+        # Silently fail and return None if we can't determine the type
+        pass
+    return None
+
+
 def download_artifact(
     page: Page, notebook_id: str, artifact_name: str
 ) -> Dict[str, Any]:
     """
     Download an artifact from a notebook.
+    Handles different artifact types with appropriate download methods:
+    - Mindmaps: Click artifact, collapse nodes, then download
+    - Video/Audio: Use menu trigger, expect popup and download
+    - Others: Try video/audio pattern first, fallback to direct download
 
     Args:
         page: The Playwright Page object
@@ -236,7 +269,7 @@ def download_artifact(
         artifact_name: Name of the artifact to download
 
     Returns:
-        Dictionary with status and message
+        Dictionary with status, message, and download path
 
     Raises:
         NotebookLMError: If downloading artifact fails
@@ -245,25 +278,96 @@ def download_artifact(
         navigate_to_notebook(page, notebook_id)
         close_dialogs(page)
         artifact_library = _artifact_library(page)
-        artifact_button = (
+        # Find the artifact container (item or note) that contains the artifact
+        artifact_container = (
             artifact_library.locator(
-                "artifact-library-item button.artifact-button-content, artifact-library-note button.artifact-button-content"
+                "artifact-library-item, artifact-library-note"
             )
             .filter(has_text=artifact_name)
             .first
         )
-        artifact_button.wait_for(timeout=10_000)
-        artifact_button.click()
-        page.wait_for_timeout(500)
-        download_button = page.get_by_role(
-            "button", name=re.compile("Download", re.IGNORECASE)
-        ).first
-        download_button.wait_for(timeout=5_000)
-        download_button.click()
-        page.wait_for_timeout(2_000)
+        artifact_container.wait_for(timeout=10_000)
+        
+        # Get artifact type to determine download method
+        artifact_type = _get_artifact_type(page, artifact_container)
+        
+        # Handle mindmap downloads differently
+        if artifact_type == "mind_map":
+            # Click the artifact button to open it
+            artifact_button = page.get_by_role("button", name=artifact_name)
+            artifact_button.wait_for(timeout=10_000, state="visible")
+            artifact_button.click()
+            page.wait_for_timeout(1_000)
+            
+            # Click "Collapse all nodes" button
+            collapse_button = page.get_by_role(
+                "button", name=re.compile("Collapse all nodes", re.IGNORECASE)
+            )
+            collapse_button.wait_for(timeout=10_000, state="visible")
+            collapse_button.click()
+            page.wait_for_timeout(500)
+            
+            # Wait for download and click Download button
+            with page.expect_download(timeout=30_000) as download_info:
+                download_button = page.get_by_role(
+                    "button", name=re.compile("Download", re.IGNORECASE)
+                )
+                download_button.wait_for(timeout=5_000, state="visible")
+                download_button.click()
+            download = download_info.value
+        else:
+            # Handle video/audio downloads (and others that trigger popup)
+            # Find the menu trigger button (More button) within the artifact container
+            # The More button has class "artifact-more-button" and aria-label="More"
+            menu_trigger = artifact_container.locator(".artifact-more-button").first
+            # If menu trigger not found, try alternative selector
+            if menu_trigger.count() == 0:
+                menu_trigger = artifact_container.get_by_label("More")
+            menu_trigger.wait_for(timeout=5_000, state="visible")
+            menu_trigger.click()
+            page.wait_for_timeout(300)
+            
+            # Wait for both download and popup, then click Download menuitem
+            # This pattern is required for video and audio downloads
+            with page.expect_download(timeout=30_000) as download_info:
+                with page.expect_popup(timeout=10_000) as popup_info:
+                    download_menuitem = page.get_by_role(
+                        "menuitem", name=re.compile("Download", re.IGNORECASE)
+                    )
+                    download_menuitem.wait_for(timeout=5_000, state="visible")
+                    download_menuitem.click()
+                popup = popup_info.value
+            download = download_info.value
+            # Close the popup
+            popup.close()
+            page.wait_for_timeout(500)
+        
+        # Wait for download to complete and get the path
+        # Verify download is a Download object, not a string
+        if isinstance(download, str):
+            raise NotebookLMError(f"Download object is a string, not a Download object: {download}")
+        
+        # Get download path - path() is a method that waits for download completion
+        # Check if path is callable (method) or a property
+        if callable(getattr(download, 'path', None)):
+            download_path = download.path()
+        else:
+            # If path is a property, access it directly
+            download_path = download.path
+        
+        # Get suggested filename - suggested_filename() is a method
+        # Check if suggested_filename is callable (method) or a property
+        if callable(getattr(download, 'suggested_filename', None)):
+            suggested_filename = download.suggested_filename()
+        else:
+            # If suggested_filename is a property, access it directly
+            suggested_filename = download.suggested_filename
+        
         return {
             "status": "success",
-            "message": f"Download triggered for {artifact_name}.",
+            "message": f"Download completed for {artifact_name}.",
+            "download_path": str(download_path) if download_path else None,
+            "filename": str(suggested_filename) if suggested_filename else None,
         }
     except NotebookLMError:
         raise

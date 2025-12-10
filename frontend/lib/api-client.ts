@@ -300,14 +300,85 @@ export const artifactApi = {
   download: async (
     notebookId: string,
     artifactName: string
-  ): Promise<TaskStatusResponse<{ status: string; message: string }>> => {
-    return submitTask(() =>
-      api
-        .post<TaskSubmissionResponse>(
-          `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/download`
-        )
-        .then((res) => res.data)
+  ): Promise<void> => {
+    // Download the file directly
+    const response = await api.post(
+      `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/download`,
+      {},
+      {
+        responseType: 'blob', // Important: tell axios to handle binary data
+        headers: {
+          'Content-Type': undefined, // Let browser set Content-Type for file download
+        },
+      }
     );
+    
+    // Get filename from Content-Disposition header or use artifact name
+    let filename = artifactName;
+    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+    
+    if (contentDisposition) {
+      // Try multiple patterns to extract filename
+      // Pattern 1: filename="value" or filename='value'
+      let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '').trim();
+      } else {
+        // Pattern 2: filename*=UTF-8''value (RFC 5987)
+        filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          try {
+            filename = decodeURIComponent(filenameMatch[1]);
+          } catch (e) {
+            // If decoding fails, use as-is
+            filename = filenameMatch[1];
+          }
+        } else {
+          // Pattern 3: filename=value (without quotes)
+          filenameMatch = contentDisposition.match(/filename=([^;\n]+)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].trim();
+          }
+        }
+      }
+    }
+    
+    // Clean up filename (remove any URL encoding, extra spaces, etc.)
+    filename = filename.trim();
+    
+    // Ensure filename has an extension
+    if (!filename.includes('.')) {
+      // Try to get extension from Content-Type or default to .png
+      const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+      if (contentType.includes('png')) {
+        filename = `${filename}.png`;
+      } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+        filename = `${filename}.jpg`;
+      } else if (contentType.includes('pdf')) {
+        filename = `${filename}.pdf`;
+      } else if (contentType.includes('mp4')) {
+        filename = `${filename}.mp4`;
+      } else if (contentType.includes('mpeg') || contentType.includes('mp3')) {
+        filename = `${filename}.mp3`;
+      } else {
+        filename = `${filename}.png`; // Default to PNG for images
+      }
+    }
+    
+    // Remove any path separators that might have been included
+    filename = filename.split('/').pop() || filename;
+    filename = filename.split('\\').pop() || filename;
+    
+    // Create a blob URL and trigger download
+    const blob = new Blob([response.data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   createAudioOverview: async (

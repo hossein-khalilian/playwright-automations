@@ -52,8 +52,8 @@ export default function ArtifactManager({
       setDownloading(artifactName);
       setError('');
       setInfo('');
-      const status = await artifactApi.download(notebookId, artifactName);
-      setInfo(status.message || 'Download triggered.');
+      await artifactApi.download(notebookId, artifactName);
+      setInfo('Download completed successfully.');
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.detail || err.message || 'Failed to download artifact';
@@ -189,27 +189,22 @@ export default function ArtifactManager({
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
-                    {artifact.has_play && (
-                      <button
-                        className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
-                        onClick={() => handleDownload(artifact.name || '')}
-                        disabled={downloading === artifact.name}
-                      >
-                        {downloading === artifact.name ? (
-                          <>
-                            <div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                            <span>Downloading...</span>
-                          </>
-                        ) : (
-                          <span>Play</span>
-                        )}
-                      </button>
-                    )}
-                    {artifact.status === 'ready' && (
+                    {/* Show download button for ready artifacts or mindmaps (which may have "unknown" status) */}
+                    {/* Note: Play button removed for audio/video - they use download instead */}
+                    {(artifact.status === 'ready' || artifact.type === 'mind_map') && (
                       <button
                         onClick={() => handleDownload(artifact.name || '')}
                         className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
                         disabled={downloading === artifact.name}
+                        title={
+                          artifact.type === 'mind_map'
+                            ? 'Download mindmap'
+                            : artifact.type === 'video_overview'
+                            ? 'Download video'
+                            : artifact.type === 'audio_overview'
+                            ? 'Download audio'
+                            : 'Download artifact'
+                        }
                       >
                         {downloading === artifact.name ? (
                           <>

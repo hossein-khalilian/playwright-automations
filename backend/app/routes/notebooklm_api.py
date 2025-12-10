@@ -1,9 +1,12 @@
 import os
 import tempfile
+import time
 from pathlib import Path
+from urllib.parse import quote
 
 from celery.result import AsyncResult
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.auth import CurrentUser
 from app.celery_app import celery_app
@@ -333,15 +336,132 @@ def rename_artifact_endpoint(
 
 @router.post(
     "/notebooks/{notebook_id}/artifacts/{artifact_name}/download",
-    response_model=TaskSubmissionResponse,
-    status_code=status.HTTP_202_ACCEPTED,
     tags=["Artifacts - Management"],
 )
 def download_artifact_endpoint(
     notebook_id: str, artifact_name: str, current_user: CurrentUser
-) -> TaskSubmissionResponse:
-    return _submit(
+):
+    """
+    Download an artifact. Waits for download to complete and returns the file.
+    """
+    # Submit the download task and wait for it to complete
+    task_result = _submit(
         download_artifact_task, notebook_id, artifact_name, _headless(), _profile()
+    )
+    
+    # Wait for the task to complete
+    status_result = _task_status(task_result.task_id)
+    
+    # Poll until task is complete (wait up to 2 minutes)
+    max_attempts = 60
+    poll_interval = 2
+    for attempt in range(max_attempts):
+        if status_result.status in ("success", "failure"):
+            break
+        time.sleep(poll_interval)
+        status_result = _task_status(task_result.task_id)
+    
+    if status_result.status != "success":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=status_result.message or "Download failed",
+        )
+    
+    # Get the download path from the result
+    result = status_result.result
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Download completed but no result returned",
+        )
+    
+    if not isinstance(result, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected result format: {type(result)}",
+        )
+    
+    if "download_path" not in result:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Download completed but file path not found in result",
+        )
+    
+    download_path = result["download_path"]
+    suggested_filename = result.get("filename", f"{artifact_name}.png")
+    
+    # Ensure filename has an extension
+    filename = suggested_filename
+    if not Path(filename).suffix:
+        # If no extension, try to detect from actual file or default to .png
+        actual_file_ext = Path(download_path).suffix
+        if actual_file_ext:
+            filename = f"{filename}{actual_file_ext}"
+        else:
+            filename = f"{filename}.png"
+    
+    # Check if file exists
+    if not os.path.exists(download_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Downloaded file not found at {download_path}",
+        )
+    
+    # Determine media type from file extension
+    file_ext = Path(filename).suffix.lower()
+    media_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".pdf": "application/pdf",
+        ".mp4": "video/mp4",
+        ".mp3": "audio/mpeg",
+        ".json": "application/json",
+    }
+    media_type = media_types.get(file_ext, "application/octet-stream")
+    
+    # Clean filename for safe header usage
+    # Remove any path components and ensure it's a valid filename
+    safe_filename = os.path.basename(filename)
+    
+    # Create ASCII-safe filename for Content-Disposition header
+    # HTTP headers must be encodable in latin-1
+    try:
+        # Try to encode as latin-1 to check if it's safe
+        safe_filename.encode('latin-1')
+        header_filename = safe_filename
+    except UnicodeEncodeError:
+        # Filename contains non-latin-1 characters
+        # Create ASCII version by removing/replacing non-ASCII characters
+        header_filename = safe_filename.encode('ascii', 'ignore').decode('ascii')
+        if not header_filename or not header_filename.strip():
+            # If filename becomes empty, use artifact name with extension
+            file_ext = Path(safe_filename).suffix or '.png'
+            header_filename = f"{artifact_name}{file_ext}"
+    
+    # Build Content-Disposition header
+    # For Unicode filenames, we'll rely on the filename parameter of FileResponse
+    # and use a simple ASCII-safe header
+    content_disposition = f'attachment; filename="{header_filename}"'
+    
+    # Verify the header can be encoded in latin-1 (required by HTTP spec)
+    try:
+        content_disposition.encode('latin-1')
+    except UnicodeEncodeError:
+        # If still fails (shouldn't happen now), use a basic fallback
+        file_ext = Path(safe_filename).suffix or '.png'
+        content_disposition = f'attachment; filename="download{file_ext}"'
+    
+    # Return the file
+    # FileResponse will handle the filename parameter for the actual file
+    # The header provides a fallback for browsers that don't support the filename parameter
+    return FileResponse(
+        path=download_path,
+        filename=safe_filename,  # This allows Unicode in modern browsers
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition,
+        },
     )
 
 
