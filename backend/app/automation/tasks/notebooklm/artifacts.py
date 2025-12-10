@@ -1,6 +1,7 @@
 """Sync artifact management operations for NotebookLM automation."""
 
 import re
+import tempfile
 from typing import Any, Dict, List, Optional
 
 from playwright.sync_api import Page
@@ -376,6 +377,99 @@ def download_artifact(
                 download_button.click()
             download = download_info.value
             page.wait_for_timeout(500)
+        elif artifact_type == "reports":
+            # Handle report downloads: open artifact, extract content directly from DOM, then create text file
+            # Click the artifact button to open it
+            artifact_button = page.get_by_role("button", name=artifact_name)
+            artifact_button.wait_for(timeout=10_000, state="visible")
+            artifact_button.click()
+            page.wait_for_timeout(2_000)  # Wait for report content to load
+            
+            # Extract report content directly from the DOM
+            # Wait a bit more for content to fully render
+            page.wait_for_timeout(1_000)
+            
+            # Use page.evaluate to extract text content from the report
+            # This approach works better in headless/Docker environments
+            report_content = page.evaluate("""() => {
+                // Try to find the main report content area
+                // Look for common report container classes
+                const selectors = [
+                    'div[class*="report"]',
+                    'div[class*="Report"]',
+                    'div[class*="content"]',
+                    'div[class*="Content"]',
+                    'article',
+                    'main',
+                    '.document-content',
+                    '.artifact-content',
+                    '[role="article"]',
+                    '[role="main"]'
+                ];
+                
+                let content = '';
+                
+                // Try each selector
+                for (const selector of selectors) {
+                    try {
+                        const elements = document.querySelectorAll(selector);
+                        for (const element of elements) {
+                            const text = element.innerText || element.textContent || '';
+                            // Prefer longer content (likely the main content)
+                            if (text.trim().length > content.length) {
+                                content = text.trim();
+                            }
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+                
+                // If we found substantial content, return it
+                if (content.length > 100) {
+                    return content;
+                }
+                
+                // Fallback: get text from body, but filter out navigation/UI elements
+                const body = document.body;
+                if (body) {
+                    // Clone body to avoid modifying the original
+                    const clone = body.cloneNode(true);
+                    // Remove common UI elements
+                    const uiSelectors = ['nav', 'header', 'footer', 'button', '[role="button"]', '.toolbar', '.menu'];
+                    uiSelectors.forEach(sel => {
+                        const elements = clone.querySelectorAll(sel);
+                        elements.forEach(el => el.remove());
+                    });
+                    return clone.innerText || clone.textContent || '';
+                }
+                
+                return '';
+            }""")
+            
+            if not report_content or len(report_content.strip()) == 0:
+                raise NotebookLMError("Failed to extract report content from the page.")
+            
+            # Create a temporary text file with the content
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+            try:
+                temp_file.write(report_content)
+            finally:
+                temp_file.close()
+            
+            # Create a mock download object-like structure
+            class MockDownload:
+                def __init__(self, file_path, filename):
+                    self._path = file_path
+                    self._filename = filename
+                
+                def path(self):
+                    return self._path
+                
+                def suggested_filename(self):
+                    return self._filename
+            
+            download = MockDownload(temp_file.name, f"{artifact_name}.txt")
         else:
             # Handle video/audio/slide_deck downloads (and others that trigger popup from menu)
             # This includes: video_overview, audio_overview, slide_deck, reports, quiz, etc.

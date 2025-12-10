@@ -189,9 +189,9 @@ export default function ArtifactManager({
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
-                    {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, and slide decks */}
+                    {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
                     {/* Note: Play button removed for audio/video - they use download instead */}
-                    {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck') && (
+                    {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
                       <button
                         onClick={() => handleDownload(artifact.name || '')}
                         className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
@@ -209,6 +209,8 @@ export default function ArtifactManager({
                             ? 'Download flashcards'
                             : artifact.type === 'slide_deck'
                             ? 'Download slide deck'
+                            : artifact.type === 'reports'
+                            ? 'Download report'
                             : 'Download artifact'
                         }
                       >
