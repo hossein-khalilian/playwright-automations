@@ -377,7 +377,8 @@ def download_artifact(
             download = download_info.value
             page.wait_for_timeout(500)
         else:
-            # Handle video/audio downloads (and others that trigger popup from menu)
+            # Handle video/audio/slide_deck downloads (and others that trigger popup from menu)
+            # This includes: video_overview, audio_overview, slide_deck, reports, quiz, etc.
             # Find the menu trigger button (More button) within the artifact container
             # The More button has class "artifact-more-button" and aria-label="More"
             menu_trigger = artifact_container.locator(".artifact-more-button").first
