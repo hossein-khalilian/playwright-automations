@@ -189,9 +189,9 @@ export default function ArtifactManager({
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
-                    {/* Show download button for ready artifacts or mindmaps (which may have "unknown" status) */}
+                    {/* Show download button for ready artifacts, mindmaps, and infographics */}
                     {/* Note: Play button removed for audio/video - they use download instead */}
-                    {(artifact.status === 'ready' || artifact.type === 'mind_map') && (
+                    {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic') && (
                       <button
                         onClick={() => handleDownload(artifact.name || '')}
                         className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
@@ -203,6 +203,8 @@ export default function ArtifactManager({
                             ? 'Download video'
                             : artifact.type === 'audio_overview'
                             ? 'Download audio'
+                            : artifact.type === 'infographic'
+                            ? 'Download infographic'
                             : 'Download artifact'
                         }
                       >

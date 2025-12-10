@@ -315,8 +315,29 @@ def download_artifact(
                 download_button.wait_for(timeout=5_000, state="visible")
                 download_button.click()
             download = download_info.value
+        elif artifact_type == "infographic":
+            # Handle infographic downloads: open artifact, then download with popup
+            # Click the artifact button to open it
+            artifact_button = page.get_by_role("button", name=artifact_name)
+            artifact_button.wait_for(timeout=10_000, state="visible")
+            artifact_button.click()
+            page.wait_for_timeout(1_000)
+            
+            # Wait for both download and popup, then click Download button
+            with page.expect_download(timeout=30_000) as download_info:
+                with page.expect_popup(timeout=10_000) as popup_info:
+                    download_button = page.get_by_role(
+                        "button", name=re.compile("Download", re.IGNORECASE)
+                    )
+                    download_button.wait_for(timeout=5_000, state="visible")
+                    download_button.click()
+                popup = popup_info.value
+            download = download_info.value
+            # Close the popup
+            popup.close()
+            page.wait_for_timeout(500)
         else:
-            # Handle video/audio downloads (and others that trigger popup)
+            # Handle video/audio downloads (and others that trigger popup from menu)
             # Find the menu trigger button (More button) within the artifact container
             # The More button has class "artifact-more-button" and aria-label="More"
             menu_trigger = artifact_container.locator(".artifact-more-button").first
