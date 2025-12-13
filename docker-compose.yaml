@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
-    ports:
-      - "${APP_PORT}:${APP_PORT}"
+    # ports:
+    #   - "${APP_PORT}:${APP_PORT}"
     command: >
       sh -c '
       if [ "$PRODUCTION" = "false" ]; then
@@ -17,10 +17,18 @@ services:
     networks:
       - shared_net
       - backend_net
+      - proxy
     volumes:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
       - shared_tmp:/tmp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${BACKEND_BASE_URL}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=le"
+      - "traefik.http.services.backend.loadbalancer.server.port=${APP_PORT}"
 
   worker:
     build:
@@ -83,9 +91,18 @@ services:
       - backend
     networks:
       - shared_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${PUBLIC_URL}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=le"
 
 networks:
   shared_net:
+    external: true
+  proxy:
     external: true
   backend_net:
 
