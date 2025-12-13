@@ -5,8 +5,6 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
-    # ports:
-    #   - "${APP_PORT}:${APP_PORT}"
     command: >
       sh -c '
       if [ "$PRODUCTION" = "false" ]; then
@@ -24,11 +22,11 @@ services:
       - shared_tmp:/tmp
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`${BACKEND_BASE_URL}`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls=true"
-      - "traefik.http.routers.backend.tls.certresolver=le"
-      - "traefik.http.services.backend.loadbalancer.server.port=${APP_PORT}"
+      - "traefik.http.routers.automation-backend.rule=Host(`${BACKEND_BASE_URL}`)"
+      - "traefik.http.routers.automation-backend.entrypoints=websecure"
+      - "traefik.http.routers.automation-backend.tls=true"
+      - "traefik.http.routers.automation-backend.tls.certresolver=le"
+      - "traefik.http.services.automation-backend.loadbalancer.server.port=${APP_PORT}"
 
   worker:
     build:
@@ -87,17 +85,15 @@ services:
     environment:
       - NODE_ENV=development
     command: ["npm", "run", "dev"]
-    depends_on:
-      - backend
     networks:
       - shared_net
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`${PUBLIC_URL}`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls=true"
-      - "traefik.http.routers.frontend.tls.certresolver=le"
+      - "traefik.http.routers.automation-frontend.rule=Host(`${PUBLIC_URL}`)"
+      - "traefik.http.routers.automation-frontend.entrypoints=websecure"
+      - "traefik.http.routers.automation-frontend.tls=true"
+      - "traefik.http.routers.automation-frontend.tls.certresolver=le"
 
 networks:
   shared_net:
