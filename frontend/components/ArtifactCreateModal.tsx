@@ -10,6 +10,7 @@ import type {
   InfographicCreateRequest,
   SlideDeckCreateRequest,
   ReportCreateRequest,
+  ReportFormat,
   MindmapCreateRequest,
 } from '@/lib/types';
 
@@ -50,7 +51,7 @@ export default function ArtifactCreateModal({
   const [orientation, setOrientation] = useState<string>('Landscape');
   const [detailLevel, setDetailLevel] = useState<string>('Standard');
   // Report defaults: Create Your Own, English
-  const [reportFormat, setReportFormat] = useState<string>('Create Your Own');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('Create Your Own');
   const [reportLanguage, setReportLanguage] = useState<string>('english');
   const [focusText, setFocusText] = useState('');
   const [topic, setTopic] = useState('');
@@ -144,7 +145,7 @@ export default function ArtifactCreateModal({
             finalDescription = reportFormatDefaults[reportFormat] || description;
           }
           const data: ReportCreateRequest = {
-            format: reportFormat || undefined,
+            format: reportFormat,
             language: reportLanguage || undefined,
             description: finalDescription || undefined,
           };
@@ -856,7 +857,7 @@ export default function ArtifactCreateModal({
                       value={format.value}
                       checked={reportFormat === format.value}
                       onChange={(e) => {
-                        const newFormat = e.target.value;
+                        const newFormat = e.target.value as ReportFormat;
                         setReportFormat(newFormat);
                         // Auto-populate default description when format changes
                         if (reportFormatDefaults[newFormat]) {

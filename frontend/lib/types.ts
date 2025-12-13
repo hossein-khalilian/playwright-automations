@@ -229,7 +229,7 @@ export interface SlideDeckCreateResponse {
 }
 
 // Report types
-export type ReportFormat = 'Create Your Own' | 'Briefing Doc' | 'Study Guide' | 'Blog Post';
+export type ReportFormat = 'Create Your Own' | 'Briefing Doc' | 'Study Guide' | 'Blog Post' | 'Design Document' | 'Strategy Memo' | 'Concept Explainer' | 'Comparative Overview';
 
 export interface ReportCreateRequest {
   format?: ReportFormat;
