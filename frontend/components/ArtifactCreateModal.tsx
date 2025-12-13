@@ -11,6 +11,7 @@ import type {
   SlideDeckCreateRequest,
   ReportCreateRequest,
   ReportFormat,
+  AudioLanguage,
   MindmapCreateRequest,
 } from '@/lib/types';
 
@@ -52,7 +53,7 @@ export default function ArtifactCreateModal({
   const [detailLevel, setDetailLevel] = useState<string>('Standard');
   // Report defaults: Create Your Own, English
   const [reportFormat, setReportFormat] = useState<ReportFormat>('Create Your Own');
-  const [reportLanguage, setReportLanguage] = useState<string>('english');
+  const [reportLanguage, setReportLanguage] = useState<AudioLanguage>('english');
   const [focusText, setFocusText] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
@@ -884,7 +885,7 @@ export default function ArtifactCreateModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
                 <select
                   value={reportLanguage}
-                  onChange={(e) => setReportLanguage(e.target.value)}
+                  onChange={(e) => setReportLanguage(e.target.value as AudioLanguage)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
                   <option value="english">English (default)</option>
