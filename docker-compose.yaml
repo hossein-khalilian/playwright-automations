@@ -59,12 +59,18 @@ services:
     restart: unless-stopped
     command: >
       celery --broker=${CELERY_BROKER_URL} flower --port=5555
-    ports:
-      - "${FLOWER_PORT}:5555"
     depends_on:
       - worker
     networks:
       - backend_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.automation-flower.rule=Host(`${FLOWER_URL}`)"
+      - "traefik.http.routers.automation-flower.entrypoints=websecure"
+      - "traefik.http.routers.automation-flower.tls=true"
+      - "traefik.http.routers.automation-flower.tls.certresolver=le"
+      - "traefik.http.services.automation-flower.loadbalancer.server.port=${FLOWER_PORT}"
 
   redis:
     image: redis:latest
@@ -86,7 +92,6 @@ services:
       - NODE_ENV=development
     command: ["npm", "run", "dev"]
     networks:
-      - shared_net
       - proxy
     labels:
       - "traefik.enable=true"
