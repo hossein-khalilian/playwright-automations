@@ -16,6 +16,7 @@ services:
       fi'
     networks:
       - shared_net
+      - backend_net
     volumes:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
