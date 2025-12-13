@@ -39,6 +39,7 @@ services:
       - redis
     networks:
       - shared_net
+      - backend_net
     volumes:
       - ./backend:/app
       - ./browser_profiles:/browser_profiles
@@ -56,12 +57,12 @@ services:
     depends_on:
       - worker
     networks:
-      - shared_net
+      - backend_net
 
   redis:
     image: redis:latest
     networks:
-      - shared_net
+      - backend_net
 
   frontend:
     build:
@@ -70,7 +71,7 @@ services:
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "${FRONT_PORT}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -85,6 +86,7 @@ services:
 networks:
   shared_net:
     external: true
+  backend_net:
 
 volumes:
   shared_tmp:
