@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -11,12 +11,18 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, isAuthenticated } = useAuth();
+  const { register, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    router.push('/notebooks');
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push('/notebooks');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Show nothing while checking authentication or if already authenticated
+  if (authLoading || isAuthenticated) {
     return null;
   }
 

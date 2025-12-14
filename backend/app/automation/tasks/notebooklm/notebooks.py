@@ -13,15 +13,16 @@ from app.automation.tasks.notebooklm.helpers import (
 )
 
 
-def create_notebook(page: Page) -> Dict[str, str]:
+def create_notebook(page: Page, email: str = None) -> Dict[str, str]:
     """
     Create a new NotebookLM notebook.
 
     Args:
         page: The Playwright Page object
+        email: The email address used to create the notebook
 
     Returns:
-        Dictionary with status, message, page_url, and notebook_id
+        Dictionary with status, message, page_url, notebook_id, and email
 
     Raises:
         NotebookLMError: If notebook creation fails
@@ -48,6 +49,7 @@ def create_notebook(page: Page) -> Dict[str, str]:
             "message": "Notebook created.",
             "page_url": current_url,
             "notebook_id": notebook_id,
+            "email": email,
         }
     except NotebookLMError:
         raise

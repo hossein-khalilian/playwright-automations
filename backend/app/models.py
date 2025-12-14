@@ -70,6 +70,7 @@ class Notebook(BaseModel):
     notebook_id: str = Field(description="Unique identifier for the notebook")
     notebook_url: str = Field(description="URL of the notebook page")
     created_at: datetime = Field(description="Timestamp when the notebook was created")
+    email: Optional[str] = Field(None, description="Email address used to create the notebook")
 
 
 class NotebookListResponse(BaseModel):

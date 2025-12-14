@@ -5,8 +5,7 @@ from celery import Celery
 from celery.signals import worker_ready, worker_shutting_down
 
 from app.automation.tasks.google_login import check_or_login_google_sync
-from app.utils.browser_state import set_browser_resources
-from app.utils.browser_utils import initialize_page_sync
+from app.utils.browser_state import get_all_contexts, set_browser_resources
 from app.utils.config import config
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,8 @@ celery_app.conf.update(
 def initialize_browser_pool_on_worker_start(sender, **kwargs):
     """
     Initialize browser pool when Celery worker starts.
-    This ensures each worker has its own browser pool ready for tasks.
+    Each browser in the pool will have its own separate browser profile.
+    Profile names will be: {user_profile_name}_0, {user_profile_name}_1, etc.
     """
     try:
         # Get configuration from environment variables
@@ -41,54 +41,113 @@ def initialize_browser_pool_on_worker_start(sender, **kwargs):
             pool_size = 1
 
         logger.info(
-            f"[Celery Worker] Initializing browser pool with {pool_size} pages "
-            f"(profile: {user_profile_name}, headless: {headless})"
+            f"[Celery Worker] Initializing browser pool with {pool_size} browsers "
+            f"(base profile: {user_profile_name}, headless: {headless})"
+        )
+        logger.info(
+            f"[Celery Worker] Each browser will have its own profile: "
+            f"{user_profile_name}_0, {user_profile_name}_1, ..."
         )
 
-        # Initialize first browser page (this creates the context)
-        first_page, context, playwright = initialize_page_sync(
-            headless=headless, user_profile_name=user_profile_name
+        pages = []
+        contexts = []
+        
+        # Create a single playwright instance to be reused for all browsers
+        from playwright.sync_api import sync_playwright
+        from pathlib import Path
+        
+        # Calculate BASE_DIR: celery_app.py is at backend/app/, so parents[2] is project root
+        # browser_utils.py uses parents[3] because it's in backend/app/utils/
+        BASE_DIR = Path(__file__).resolve().parents[2]
+        
+        playwright = sync_playwright().start()
+        
+        user_agent = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         )
+        from app.utils.system_resolution import get_system_resolution
+        viewport = get_system_resolution()
 
-        # Check if already logged in, or login if needed
-        logger.info("[Celery Worker] Checking Google login status on first page...")
-        check_or_login_google_sync(first_page)
+        # Create separate browser instances, each with its own profile
+        for i in range(pool_size):
+            profile_name = f"{user_profile_name}_{i}"
+            logger.info(f"[Celery Worker] Creating browser {i+1}/{pool_size} with profile: {profile_name}")
+            
+            try:
+                # Create profile directory
+                context_path = BASE_DIR / "browser_profiles" / profile_name
+                context_path.mkdir(parents=True, exist_ok=True)
+                
+                # Launch persistent context with this profile
+                context = playwright.chromium.launch_persistent_context(
+                    user_data_dir=str(context_path),
+                    headless=headless,
+                    viewport=viewport,
+                    user_agent=user_agent,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-dev-shm-usage",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-infobars",
+                        "--exclude-switches=enable-automation",
+                        "--start-maximized",
+                    ],
+                    locale="en-US",
+                    timezone_id="America/New_York",
+                    extra_http_headers={
+                        "Accept-Language": "en-US,en;q=0.9",
+                    },
+                )
+                
+                # Get or create page from context
+                page = context.pages[0] if context.pages else context.new_page()
+                
+                # Setup stealth mode
+                from app.utils.browser_utils import setup_stealth_mode_sync
+                setup_stealth_mode_sync(context, page)
+                
+                # Check if already logged in, or login if needed
+                logger.info(f"[Celery Worker] Checking Google login status on browser {i+1}...")
+                check_or_login_google_sync(page)
+                
+                pages.append(page)
+                contexts.append(context)
+                
+                logger.info(f"[Celery Worker] Browser {i+1}/{pool_size} initialized successfully")
+                
+            except Exception as e:
+                logger.error(
+                    f"[Celery Worker] Failed to initialize browser {i+1} with profile {profile_name}: {e}",
+                    exc_info=True,
+                )
+                # Continue with remaining browsers even if one fails
 
-        # Create list of pages: first page + additional pages
-        pages = [first_page]
-
-        # Create additional pages from the same context
-        if pool_size > 1:
-            logger.info(f"[Celery Worker] Creating {pool_size - 1} additional pages...")
-            for i in range(pool_size - 1):
-                try:
-                    new_page = context.new_page()
-                    pages.append(new_page)
-                    logger.info(f"[Celery Worker] Created page {i + 2}/{pool_size}")
-                except Exception as e:
-                    logger.warning(f"[Celery Worker] Failed to create page {i + 2}: {e}")
+        if not pages:
+            raise Exception("Failed to initialize any browsers in the pool")
 
         # Navigate all pages to Gmail to ensure they have active session
-        logger.info("[Celery Worker] Navigating all pages to Gmail to activate login session...")
+        logger.info("[Celery Worker] Navigating all browsers to Gmail to activate login session...")
         gmail_url = "https://mail.google.com/mail/u/0/#inbox"
         for index, page in enumerate(pages):
             try:
                 if not page.is_closed():
-                    logger.info(f"[Celery Worker] Navigating page {index} to Gmail...")
+                    logger.info(f"[Celery Worker] Navigating browser {index} to Gmail...")
                     page.goto(gmail_url, wait_until="domcontentloaded", timeout=60_000)
                     page.wait_for_timeout(2_000)  # Wait for page to fully load
-                    logger.info(f"[Celery Worker] Page {index} successfully navigated to Gmail")
+                    logger.info(f"[Celery Worker] Browser {index} successfully navigated to Gmail")
                 else:
-                    logger.warning(f"[Celery Worker] Page {index} is closed, skipping navigation")
+                    logger.warning(f"[Celery Worker] Browser {index} is closed, skipping navigation")
             except Exception as e:
-                logger.warning(f"[Celery Worker] Failed to navigate page {index} to Gmail: {e}")
+                logger.warning(f"[Celery Worker] Failed to navigate browser {index} to Gmail: {e}")
 
         # Store browser resources in global state
-        set_browser_resources(pages, context, playwright)
+        set_browser_resources(pages, contexts, playwright)
 
         logger.info(
-            f"[Celery Worker] Browser pool initialized successfully with {len(pages)} pages "
-            f"(all logged into Google)!"
+            f"[Celery Worker] Browser pool initialized successfully with {len(pages)} browsers "
+            f"(each with its own profile, all logged into Google)!"
         )
     except Exception as e:
         logger.error(
@@ -108,21 +167,22 @@ def cleanup_browser_pool_on_worker_shutdown(sender, **kwargs):
     try:
         from app.utils.browser_state import (
             clear_browser_resources,
-            get_browser_context,
+            get_all_contexts,
             get_playwright,
         )
 
         logger.info("[Celery Worker] Cleaning up browser resources...")
 
-        context = get_browser_context()
+        all_contexts = get_all_contexts()
         playwright = get_playwright()
 
-        if context:
-            try:
-                context.close()
-                logger.info("[Celery Worker] Browser context closed.")
-            except Exception as e:
-                logger.warning(f"[Celery Worker] Error closing browser context: {e}")
+        if all_contexts:
+            for idx, context in enumerate(all_contexts):
+                try:
+                    context.close()
+                    logger.info(f"[Celery Worker] Browser context {idx} closed.")
+                except Exception as e:
+                    logger.warning(f"[Celery Worker] Error closing browser context {idx}: {e}")
 
         if playwright:
             try:

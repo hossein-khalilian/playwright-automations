@@ -24,6 +24,8 @@ config = {
     "MINIO_AUDIO_BUCKET": os.environ.get("MINIO_AUDIO_BUCKET"),
     # configs
     "BROWSER_POOL_SIZE": os.environ.get("BROWSER_POOL_SIZE"),
+    "GMAIL_EMAIL": os.environ.get("GMAIL_EMAIL"),
+    "GMAIL_PASSWORD": os.environ.get("GMAIL_PASSWORD"),
 }
 
 # Normalize keys to lowercase for easier access (existing behavior)

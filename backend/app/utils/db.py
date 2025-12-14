@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from pymongo import AsyncMongoClient
+from pymongo import AsyncMongoClient, MongoClient
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
 
 from app.utils.config import config
@@ -99,33 +99,47 @@ async def user_exists(username: str) -> bool:
     return user is not None
 
 
-async def save_notebook(username: str, notebook_id: str, notebook_url: str) -> bool:
+def save_notebook_sync(username: str, notebook_id: str, notebook_url: str, email: str = None) -> bool:
     """
-    Save a notebook to the database for a user.
+    Save a notebook to the database for a user (sync version for Celery tasks).
     Returns True if successful, False if database error.
     """
-    collection = await get_notebooks_collection()
-    if collection is None:
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
         return False
-
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
     try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["notebooks"]
+        
         # Create index on username and notebook_id if they don't exist
-        await collection.create_index("username")
-        await collection.create_index([("username", 1), ("notebook_id", 1)], unique=True)
-
+        collection.create_index("username")
+        collection.create_index([("username", 1), ("notebook_id", 1)], unique=True)
+        
         notebook_doc = {
             "username": username,
             "notebook_id": notebook_id,
             "notebook_url": notebook_url,
             "created_at": datetime.now(timezone.utc),
         }
-        await collection.insert_one(notebook_doc)
+        if email:
+            notebook_doc["email"] = email
+        collection.insert_one(notebook_doc)
         return True
     except DuplicateKeyError:
         # Notebook already exists for this user, which is fine
         return True
+    except ConnectionFailure:
+        return False
     except Exception:
         return False
+    finally:
+        if client is not None:
+            client.close()
 
 
 async def get_notebooks_by_user(username: str) -> List[dict]:

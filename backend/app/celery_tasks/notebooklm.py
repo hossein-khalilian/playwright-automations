@@ -37,6 +37,8 @@ from app.automation.tasks.notebooklm.video_overview import create_video_overview
 from app.celery_app import celery_app
 from app.utils.browser_state import get_page_from_pool, return_page_to_pool
 from app.utils.browser_utils import initialize_page_sync
+from app.utils.config import config
+from app.utils.db import save_notebook_sync
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +124,26 @@ def _run_with_browser(
 
 
 @celery_app.task(name="notebooklm.create_notebook")
-def create_notebook_task(headless: bool, profile: str) -> Dict[str, Any]:
+def create_notebook_task(username: str, headless: bool, profile: str) -> Dict[str, Any]:
     """Create a new NotebookLM notebook."""
-    return _run_with_browser(create_notebook, headless, profile)
+    email = config.get("gmail_email")
+    result = _run_with_browser(create_notebook, headless, profile, email=email)
+    
+    # Save notebook to MongoDB if creation was successful
+    if result.get("status") == "success":
+        notebook_id = result.get("notebook_id")
+        notebook_url = result.get("page_url")
+        if notebook_id and notebook_url:
+            try:
+                saved = save_notebook_sync(username, notebook_id, notebook_url, email)
+                if saved:
+                    logger.info(f"Notebook {notebook_id} saved to MongoDB for user {username}")
+                else:
+                    logger.warning(f"Failed to save notebook {notebook_id} to MongoDB for user {username}")
+            except Exception as exc:
+                logger.error(f"Error saving notebook {notebook_id} to MongoDB: {exc}", exc_info=True)
+    
+    return result
 
 
 @celery_app.task(name="notebooklm.delete_notebook")

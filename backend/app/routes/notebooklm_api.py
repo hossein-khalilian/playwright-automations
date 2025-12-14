@@ -122,6 +122,7 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
             notebook_id=doc["notebook_id"],
             notebook_url=doc["notebook_url"],
             created_at=doc["created_at"],
+            email=doc.get("email"),
         )
         for doc in notebooks_data
     ]
@@ -135,7 +136,7 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
     tags=["Notebooks"],
 )
 def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
-    return _submit(create_notebook_task, _headless(), _profile())
+    return _submit(create_notebook_task, current_user.username, _headless(), _profile())
 
 
 @router.delete(
