@@ -28,37 +28,37 @@ def add_source_to_notebook(
     """
     try:
         navigate_to_notebook(page, notebook_id)
+        page.wait_for_timeout(1_000)
+
+        # Always start from a clean state
         close_dialogs(page)
-        add_source_button = page.get_by_role("button", name="Add source")
-        add_source_button.wait_for(timeout=10_000)
+
+        add_source_button = page.get_by_role("button", name=re.compile("^Add source$", re.IGNORECASE))
+        add_source_button.wait_for(timeout=10_000, state="visible")
         add_source_button.click()
         page.wait_for_timeout(500)
-        
-        # Check if dialog appears (only shows if no sources exist)
-        dialog = page.locator('[id^="mat-mdc-dialog-"]').last
-        dialog_appeared = False
+
+        # The new UI opens a dialog with multiple source types (upload, link, drive, etc.)
+        # Target the upload option and then the underlying file input.
+        dialog = page.get_by_role("dialog").last
+        dialog.wait_for(timeout=5_000, state="visible")
+
+        upload_button = dialog.get_by_role(
+            "button", name=re.compile("^Upload files$", re.IGNORECASE)
+        ).first
+        upload_button.wait_for(timeout=5_000, state="visible")
+        upload_button.click()
+        page.wait_for_timeout(300)
+
+        # The upload button wires to a hidden file input inside the dialog
+        file_input = dialog.locator('input[type="file"]').first
         try:
-            dialog.wait_for(timeout=3_000, state="visible")
-            dialog_appeared = True
+            file_input.wait_for(timeout=5_000, state="attached")
         except Exception:
-            # Dialog didn't appear - sources might already exist
-            pass
-        
-        if dialog_appeared:
-            # Dialog appeared - use the "choose file" button flow
-            choose_file_button = page.get_by_role("button", name="choose file")
-            choose_file_button.wait_for(timeout=5_000)
-            choose_file_button.click()
-            page.wait_for_timeout(1_000)
-            # Wait for dialog to be ready and find file input within it
-            dialog.wait_for(timeout=5_000)
-            file_input = dialog.locator('input[type="file"]')
+            # Fallback: some variants render the input at the page level
+            file_input = page.locator('input[type="file"]').first
             file_input.wait_for(timeout=5_000, state="attached")
-        else:
-            # Dialog didn't appear - look for file input directly on page
-            file_input = page.locator('input[type="file"]')
-            file_input.wait_for(timeout=5_000, state="attached")
-        
+
         file_input.set_input_files(file_path)
         page.wait_for_timeout(2_000)
         return {

@@ -57,14 +57,67 @@ def navigate_to_main_page(page: Page) -> None:
 def close_dialogs(page: Page) -> None:
     """
     Close any dialogs that might appear on the page.
-
+    
+    Handles:
+    - The "add source" dialog that appears when a notebook has no sources
+      (detected by URL with ?addSource=true or textbox "Discover sources based on the")
+    - Generic "Close dialog" buttons
+    
     Args:
         page: The Playwright Page object
     """
+    # Wait a bit for any dialogs to appear
+    page.wait_for_timeout(500)
+    
+    # Check if URL has addSource=true parameter (indicates add source dialog)
+    current_url = page.url
+    has_add_source_param = "addSource=true" in current_url
+    
+    # Try to close the "add source" dialog first
+    # This dialog appears when a notebook has no sources
+    try:
+        # Look for the textbox that appears in the add source dialog
+        discover_textbox = page.get_by_role("textbox", name="Discover sources based on the")
+        discover_textbox.wait_for(timeout=3_000, state="visible")
+        # Press Escape to close the dialog
+        discover_textbox.press("Escape")
+        page.wait_for_timeout(500)
+        # Wait for URL to update (remove addSource parameter)
+        if has_add_source_param:
+            try:
+                page.wait_for_function(
+                    "() => !window.location.href.includes('addSource=true')",
+                    timeout=3_000,
+                )
+            except PlaywrightTimeoutError:
+                pass
+    except PlaywrightTimeoutError:
+        # Add source dialog might not be present, which is fine
+        pass
+    
+    # Also handle the add source dialog if URL indicates it
+    if has_add_source_param:
+        try:
+            # Try pressing Escape on the page itself as a fallback
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(500)
+            # Wait for URL to update
+            try:
+                page.wait_for_function(
+                    "() => !window.location.href.includes('addSource=true')",
+                    timeout=3_000,
+                )
+            except PlaywrightTimeoutError:
+                pass
+        except Exception:
+            pass
+    
+    # Handle generic "Close dialog" buttons
     try:
         close_button = page.get_by_role("button", name="Close dialog")
-        close_button.wait_for(timeout=5_000)
+        close_button.wait_for(timeout=2_000, state="visible")
         close_button.click()
+        page.wait_for_timeout(500)
     except PlaywrightTimeoutError:
         # Dialog might not appear, which is fine
         pass

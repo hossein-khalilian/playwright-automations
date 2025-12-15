@@ -21,6 +21,7 @@ export default function SourceManager({
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [renamingSubmitting, setRenamingSubmitting] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -72,12 +73,14 @@ export default function SourceManager({
   };
 
   const handleRename = async (sourceName: string) => {
+    if (renamingSubmitting) return;
     if (!newName.trim()) {
       setRenaming(null);
       return;
     }
 
     try {
+      setRenamingSubmitting(sourceName);
       setError('');
       setInfo('');
       const status = await sourceApi.rename(notebookId, sourceName, newName.trim());
@@ -89,6 +92,8 @@ export default function SourceManager({
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to rename source';
       setError(errorMessage);
       console.error('Rename error:', err);
+    } finally {
+      setRenamingSubmitting(null);
     }
   };
 
@@ -203,6 +208,7 @@ export default function SourceManager({
                           type="text"
                           value={newName}
                           onChange={(e) => setNewName(e.target.value)}
+                          disabled={renamingSubmitting === source.name}
                           className="rounded-md border border-gray-300 px-2 py-1 text-sm"
                           placeholder="New name"
                           autoFocus
@@ -217,16 +223,18 @@ export default function SourceManager({
                         />
                         <button
                           onClick={() => handleRename(source.name)}
-                          className="rounded-md bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-500"
+                          disabled={renamingSubmitting === source.name}
+                          className="rounded-md bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-500 disabled:opacity-50"
                         >
-                          Save
+                          {renamingSubmitting === source.name ? 'Saving...' : 'Save'}
                         </button>
                         <button
                           onClick={() => {
                             setRenaming(null);
                             setNewName('');
                           }}
-                          className="rounded-md bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300"
+                          disabled={renamingSubmitting === source.name}
+                          className="rounded-md bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300 disabled:opacity-50"
                         >
                           Cancel
                         </button>
