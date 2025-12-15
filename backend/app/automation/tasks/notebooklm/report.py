@@ -46,22 +46,38 @@ def create_report(
 
         # Select format
         if format:
-            # If format is "Create Your Own", click that button
-            if format == "Create Your Own":
-                try:
-                    create_your_own_button = page.get_by_role(
-                        "button", name="Create Your Own"
-                    )
-                    create_your_own_button.wait_for(timeout=10_000, state="visible")
-                    create_your_own_button.click()
-                    page.wait_for_timeout(1_500)
-                except Exception:
-                    # If button not found, continue - might already be on Create Your Own screen
-                    pass
-            else:
-                # For other formats, try to find and click the format button
-                # The format buttons may be in a list or grid
-                try:
+            # Try to mirror the UI flow used by Playwright codegen:
+            #   - Click the desired report tile
+            #   - For templates like "Briefing Doc", click the "Customize Report" button
+            #     inside that tile to open the customization dialog.
+            try:
+                # First, look for a report-customization-tile that contains the format text
+                # (e.g. "Briefing Doc", "Study Guide", "Blog Post", etc.)
+                format_tile = page.locator("report-customization-tile").filter(
+                    has_text=re.compile(re.escape(format), re.IGNORECASE)
+                )
+
+                if format_tile.count() > 0:
+                    tile = format_tile.first
+
+                    # Prefer the "Customize Report" button inside the tile when it exists,
+                    # as this reliably opens the dialog with language + description fields.
+                    customize_btn = tile.get_by_label("Customize Report")
+                    if customize_btn.count() > 0:
+                        customize_btn.first.wait_for(timeout=10_000, state="visible")
+                        customize_btn.first.click()
+                        page.wait_for_timeout(1_500)
+                    else:
+                        # Fallback: click the primary action button for the tile
+                        primary_btn = tile.get_by_role(
+                            "button", name=re.compile(re.escape(format), re.IGNORECASE)
+                        )
+                        if primary_btn.count() > 0:
+                            primary_btn.first.wait_for(timeout=10_000, state="visible")
+                            primary_btn.first.click()
+                            page.wait_for_timeout(1_500)
+                else:
+                    # Legacy fallback behaviour: click by button name or generic text match
                     format_button = page.get_by_role("button", name=format)
                     if format_button.count() > 0:
                         format_button.first.wait_for(timeout=10_000, state="visible")
@@ -69,13 +85,17 @@ def create_report(
                         page.wait_for_timeout(1_500)
                     else:
                         # Fallback: try to find by text content
-                        format_locator = page.locator("button, div, span").filter(has_text=format).first
+                        format_locator = (
+                            page.locator("button, div, span")
+                            .filter(has_text=format)
+                            .first
+                        )
                         if format_locator.count() > 0:
                             format_locator.click()
                             page.wait_for_timeout(1_500)
-                except Exception:
-                    # If format button not found, continue - might already be on the correct screen
-                    pass
+            except Exception:
+                # If format selection fails, continue – it may already be on the correct screen.
+                pass
 
         # Click the description textbox (Input to describe the kind of)
         desc_textbox = page.get_by_role(
