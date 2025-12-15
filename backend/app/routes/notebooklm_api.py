@@ -148,7 +148,13 @@ def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionRespons
 def delete_notebook_endpoint(
     notebook_id: str, current_user: CurrentUser
 ) -> TaskSubmissionResponse:
-    return _submit(delete_notebook_task, notebook_id, _headless(), _profile())
+    return _submit(
+        delete_notebook_task,
+        current_user.username,
+        notebook_id,
+        _headless(),
+        _profile(),
+    )
 
 
 # ============================================================================

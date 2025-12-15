@@ -38,7 +38,7 @@ from app.celery_app import celery_app
 from app.utils.browser_state import get_page_from_pool, return_page_to_pool
 from app.utils.browser_utils import initialize_page_sync
 from app.utils.config import config
-from app.utils.db import save_notebook_sync
+from app.utils.db import delete_notebook_sync, save_notebook_sync
 
 logger = logging.getLogger(__name__)
 
@@ -148,10 +148,27 @@ def create_notebook_task(username: str, headless: bool, profile: str) -> Dict[st
 
 @celery_app.task(name="notebooklm.delete_notebook")
 def delete_notebook_task(
-    notebook_id: str, headless: bool, profile: str
+    username: str, notebook_id: str, headless: bool, profile: str
 ) -> Dict[str, Any]:
-    """Delete a NotebookLM notebook."""
-    return _run_with_browser(delete_notebook, headless, profile, notebook_id)
+    """Delete a NotebookLM notebook and remove its DB record."""
+    result = _run_with_browser(delete_notebook, headless, profile, notebook_id)
+
+    if result.get("status") == "success":
+        try:
+            deleted = delete_notebook_sync(username, notebook_id)
+            if deleted:
+                logger.info(f"Notebook {notebook_id} removed from MongoDB for user {username}")
+            else:
+                logger.warning(
+                    f"Notebook {notebook_id} deletion succeeded in UI but failed to remove from MongoDB for user {username}"
+                )
+        except Exception as exc:
+            logger.error(
+                f"Error deleting notebook {notebook_id} from MongoDB for user {username}: {exc}",
+                exc_info=True,
+            )
+
+    return result
 
 
 # ============================================================================

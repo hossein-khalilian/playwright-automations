@@ -14,6 +14,7 @@ export default function NotebooksPage() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
@@ -57,11 +58,13 @@ export default function NotebooksPage() {
   };
 
   const handleDelete = async (notebookId: string) => {
+    if (deletingId) return;
     if (!confirm('Are you sure you want to delete this notebook?')) {
       return;
     }
 
     try {
+      setDeletingId(notebookId);
       setInfo('');
       const status = await notebookApi.delete(notebookId);
       setInfo(status.message || 'Notebook deletion submitted.');
@@ -69,6 +72,8 @@ export default function NotebooksPage() {
     } catch (err: any) {
       const message = err.response?.data?.detail || err.message || 'Failed to delete notebook';
       setError(message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -139,9 +144,10 @@ export default function NotebooksPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(notebook.notebook_id)}
-                      className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500"
+                      disabled={deletingId === notebook.notebook_id}
+                      className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
                     >
-                      Delete
+                      {deletingId === notebook.notebook_id ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>

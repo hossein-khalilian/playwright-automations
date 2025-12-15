@@ -74,20 +74,31 @@ def delete_notebook(page: Page, notebook_id: str) -> Dict[str, str]:
     try:
         navigate_to_main_page(page)
         close_dialogs(page)
-        mat_card = page.locator(
-            f'mat-card[aria-labelledby*="project-{notebook_id}-title"]'
-        )
-        mat_card.wait_for(timeout=10_000)
-        actions_menu = mat_card.get_by_role("button", name="Project Actions Menu")
-        actions_menu.wait_for(timeout=5_000)
+        # Cards are identified by project-{id}-title. Use that anchor to find the card.
+        title_locator = page.locator(f'#project-{notebook_id}-title')
+        try:
+            title_locator.wait_for(timeout=10_000, state="visible")
+            mat_card = title_locator.locator("xpath=ancestor::mat-card[1]")
+        except Exception:
+            # Fallback to aria-labelledby contains pattern
+            mat_card = page.locator(
+                f'mat-card[aria-labelledby*="project-{notebook_id}-title"]'
+            )
+            mat_card.wait_for(timeout=10_000)
+
+        # Open actions menu and trigger delete
+        actions_menu = mat_card.get_by_role("button", name="Project Actions Menu").first
+        actions_menu.wait_for(timeout=5_000, state="visible")
         actions_menu.click()
-        page.wait_for_timeout(500)
-        delete_menuitem = page.get_by_role("menuitem", name="Delete")
-        delete_menuitem.wait_for(timeout=5_000)
+        page.wait_for_timeout(300)
+
+        delete_menuitem = page.get_by_role("menuitem", name="Delete").first
+        delete_menuitem.wait_for(timeout=5_000, state="visible")
         delete_menuitem.click()
-        page.wait_for_timeout(500)
-        confirm_button = page.get_by_role("button", name="Confirm deletion")
-        confirm_button.wait_for(timeout=5_000)
+        page.wait_for_timeout(300)
+
+        confirm_button = page.get_by_role("button", name="Confirm deletion").first
+        confirm_button.wait_for(timeout=5_000, state="visible")
         confirm_button.click()
         page.wait_for_timeout(1_000)
         return {"status": "success", "message": f"Notebook {notebook_id} deleted."}

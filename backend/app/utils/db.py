@@ -142,6 +142,33 @@ def save_notebook_sync(username: str, notebook_id: str, notebook_url: str, email
             client.close()
 
 
+def delete_notebook_sync(username: str, notebook_id: str) -> bool:
+    """
+    Delete a notebook from the database for a user (sync version for Celery tasks).
+    Returns True if successful (including if notebook didn't exist), False on database error.
+    """
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return False
+
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["notebooks"]
+
+        collection.delete_one({"username": username, "notebook_id": notebook_id})
+        return True
+    except ConnectionFailure:
+        return False
+    except Exception:
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
 async def get_notebooks_by_user(username: str) -> List[dict]:
     """
     Get all notebooks for a user.
