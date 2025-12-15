@@ -76,21 +76,24 @@ def close_dialogs(page: Page) -> None:
     # Try to close the "add source" dialog first
     # This dialog appears when a notebook has no sources
     try:
-        # Look for the textbox that appears in the add source dialog
-        discover_textbox = page.get_by_role("textbox", name="Discover sources based on the")
-        discover_textbox.wait_for(timeout=3_000, state="visible")
-        # Press Escape to close the dialog
-        discover_textbox.press("Escape")
-        page.wait_for_timeout(500)
-        # Wait for URL to update (remove addSource parameter)
-        if has_add_source_param:
-            try:
-                page.wait_for_function(
-                    "() => !window.location.href.includes('addSource=true')",
-                    timeout=3_000,
-                )
-            except PlaywrightTimeoutError:
-                pass
+        # Look for the textbox that appears in the add source dialog.
+        # In the new UI there can be multiple matches; use the first visible one to avoid strict-mode errors.
+        discover_textboxes = page.get_by_role("textbox", name="Discover sources based on the")
+        if discover_textboxes.count() > 0:
+            discover_textbox = discover_textboxes.first
+            discover_textbox.wait_for(timeout=3_000, state="visible")
+            # Press Escape to close the dialog
+            discover_textbox.press("Escape")
+            page.wait_for_timeout(500)
+            # Wait for URL to update (remove addSource parameter)
+            if has_add_source_param:
+                try:
+                    page.wait_for_function(
+                        "() => !window.location.href.includes('addSource=true')",
+                        timeout=3_000,
+                    )
+                except PlaywrightTimeoutError:
+                    pass
     except PlaywrightTimeoutError:
         # Add source dialog might not be present, which is fine
         pass
