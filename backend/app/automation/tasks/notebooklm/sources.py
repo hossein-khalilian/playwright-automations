@@ -38,28 +38,155 @@ def add_source_to_notebook(
         add_source_button.click()
         page.wait_for_timeout(500)
 
-        # The new UI opens a dialog with multiple source types (upload, link, drive, etc.)
-        # Target the upload option and then the underlying file input.
+        # The UI opens a dialog with multiple source types (upload, link, drive, etc.)
+        # Handle both UI variations:
+        # 1. New UI: Has "choose file" button/link directly in the dialog
+        # 2. Old UI: Has "Upload files" button that needs to be clicked first
         dialog = page.get_by_role("dialog").last
         dialog.wait_for(timeout=5_000, state="visible")
 
-        upload_button = dialog.get_by_role(
-            "button", name=re.compile("^Upload files$", re.IGNORECASE)
-        ).first
-        upload_button.wait_for(timeout=5_000, state="visible")
-        upload_button.click()
-        page.wait_for_timeout(300)
+        file_input = None
+        uploaded = False
 
-        # The upload button wires to a hidden file input inside the dialog
-        file_input = dialog.locator('input[type="file"]').first
+        # Strategy 1: Try the new UI with "choose file" button/link
         try:
-            file_input.wait_for(timeout=5_000, state="attached")
+            # Try finding "choose file" by role (works for both button and span with role="button")
+            choose_file_button = dialog.get_by_role(
+                "button", name=re.compile("choose file", re.IGNORECASE)
+            ).first
+            choose_file_button.wait_for(timeout=3_000, state="visible")
+            choose_file_button.click()
+            page.wait_for_timeout(300)
+            
+            # After clicking "choose file", the file input should be available
+            # Try finding it in the dialog first, then fallback to page level
+            file_input = dialog.locator('input[type="file"]').first
+            try:
+                file_input.wait_for(timeout=3_000, state="attached")
+                file_input.set_input_files(file_path)
+                uploaded = True
+            except Exception:
+                # Fallback: try page level
+                file_input = page.locator('input[type="file"]').first
+                file_input.wait_for(timeout=3_000, state="attached")
+                file_input.set_input_files(file_path)
+                uploaded = True
         except Exception:
-            # Fallback: some variants render the input at the page level
-            file_input = page.locator('input[type="file"]').first
-            file_input.wait_for(timeout=5_000, state="attached")
+            # Strategy 1a: Try finding "choose file" by text content (for spans with role="button")
+            try:
+                choose_file_element = dialog.locator(
+                    'text=/choose file/i'
+                ).first
+                choose_file_element.wait_for(timeout=2_000, state="visible")
+                choose_file_element.click()
+                page.wait_for_timeout(300)
+                
+                file_input = dialog.locator('input[type="file"]').first
+                try:
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+                except Exception:
+                    file_input = page.locator('input[type="file"]').first
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+            except Exception:
+                # Strategy 1 failed, try Strategy 2
+                pass
 
-        file_input.set_input_files(file_path)
+        # Strategy 2: Try the old UI with "Upload files" button
+        if not uploaded:
+            try:
+                upload_button = dialog.get_by_role(
+                    "button", name=re.compile("^Upload files$", re.IGNORECASE)
+                ).first
+                upload_button.wait_for(timeout=3_000, state="visible")
+                upload_button.click()
+                page.wait_for_timeout(300)
+
+                # The upload button wires to a hidden file input inside the dialog
+                file_input = dialog.locator('input[type="file"]').first
+                try:
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+                except Exception:
+                    # Fallback: some variants render the input at the page level
+                    file_input = page.locator('input[type="file"]').first
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+            except Exception:
+                # Strategy 2 failed, try Strategy 3
+                pass
+
+        # Strategy 3: Try clicking element with xapscottyuploadertrigger attribute (new UI pattern)
+        if not uploaded:
+            try:
+                # Find element with xapscottyuploadertrigger attribute and click it
+                upload_trigger = dialog.locator('[xapscottyuploadertrigger]').first
+                upload_trigger.wait_for(timeout=3_000, state="visible")
+                upload_trigger.click()
+                page.wait_for_timeout(300)
+                
+                # After clicking, find the file input
+                file_input = dialog.locator('input[type="file"]').first
+                try:
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+                except Exception:
+                    file_input = page.locator('input[type="file"]').first
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+            except Exception:
+                # Strategy 3 failed, try Strategy 4
+                pass
+
+        # Strategy 4: Try finding file input directly in dialog (for cases where no button click is needed)
+        if not uploaded:
+            try:
+                # Try finding file input directly
+                file_input = dialog.locator('input[type="file"]').first
+                file_input.wait_for(timeout=3_000, state="attached")
+                file_input.set_input_files(file_path)
+                uploaded = True
+            except Exception:
+                # Fallback: try page level
+                try:
+                    file_input = page.locator('input[type="file"]').first
+                    file_input.wait_for(timeout=3_000, state="attached")
+                    file_input.set_input_files(file_path)
+                    uploaded = True
+                except Exception:
+                    pass
+
+        # Strategy 5: Try using dialog ID selector (as shown in user's example)
+        if not uploaded:
+            try:
+                # Try common dialog ID patterns
+                dialog_ids = ["#mat-mdc-dialog-0", "#mat-mdc-dialog-1", "#mat-mdc-dialog-2"]
+                for dialog_id in dialog_ids:
+                    try:
+                        dialog_by_id = page.locator(dialog_id)
+                        if dialog_by_id.count() > 0 and dialog_by_id.is_visible():
+                            file_input = dialog_by_id.locator('input[type="file"]').first
+                            file_input.wait_for(timeout=2_000, state="attached")
+                            file_input.set_input_files(file_path)
+                            uploaded = True
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+        if not uploaded:
+            raise NotebookLMError(
+                "Could not find file input in upload dialog. "
+                "Tried multiple UI variations but none worked."
+            )
         page.wait_for_timeout(2_000)
         return {
             "status": "success",
