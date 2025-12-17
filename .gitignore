@@ -1,5 +1,5 @@
 .vscode
 .env
-browser_profiles
+browser_profiles*
 __pycache__
 .pytest_cache
