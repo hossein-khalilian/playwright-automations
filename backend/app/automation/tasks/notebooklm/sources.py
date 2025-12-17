@@ -39,15 +39,64 @@ def add_url_source_to_notebook(
         add_source_button.click()
         page.wait_for_timeout(500)
 
-        # Click "Website" option in the dialog
-        website_button = page.get_by_text("Website")
-        website_button.wait_for(timeout=5_000, state="visible")
-        website_button.click()
-        page.wait_for_timeout(500)
+        # Try to find and click the website/URLs option - handle multiple UI variations
+        # Pattern 1: "Website" text with exact match (chip-based UI)
+        # Pattern 2: "Website" text without exact match (older UI)
+        # Pattern 3: "Websites" button (newer UI)
+        website_clicked = False
+        try:
+            # Try Pattern 1: Look for "Website" text with exact match (chip-based UI)
+            website_element = page.get_by_text("Website", exact=True)
+            website_element.wait_for(timeout=3_000, state="visible")
+            website_element.click()
+            website_clicked = True
+            page.wait_for_timeout(500)
+        except Exception:
+            # Pattern 1 failed, try Pattern 2: Look for "Website" text without exact match
+            try:
+                website_element = page.get_by_text("Website")
+                website_element.wait_for(timeout=3_000, state="visible")
+                website_element.click()
+                website_clicked = True
+                page.wait_for_timeout(500)
+            except Exception:
+                # Pattern 2 failed, try Pattern 3: Look for "Websites" button
+                try:
+                    websites_button = page.get_by_role("button", name="Websites")
+                    websites_button.wait_for(timeout=3_000, state="visible")
+                    websites_button.click()
+                    website_clicked = True
+                    page.wait_for_timeout(500)
+                except Exception:
+                    # All patterns failed
+                    pass
 
-        # Find and fill the "Paste URLs" textbox
-        urls_textbox = page.get_by_role("textbox", name="Paste URLs")
-        urls_textbox.wait_for(timeout=5_000, state="visible")
+        if not website_clicked:
+            raise NotebookLMError(
+                "Could not find Website/Websites option in the dialog. "
+                "Tried multiple UI variations but none worked."
+            )
+
+        # Find and fill the URLs textbox - handle both UI variations
+        # Pattern 1: "Paste URLs" textbox (older UI)
+        # Pattern 2: "Enter URLs" textbox (newer UI)
+        urls_textbox = None
+        try:
+            # Try Pattern 1: "Paste URLs"
+            urls_textbox = page.get_by_role("textbox", name="Paste URLs")
+            urls_textbox.wait_for(timeout=5_000, state="visible")
+        except Exception:
+            # Pattern 1 failed, try Pattern 2: "Enter URLs"
+            try:
+                urls_textbox = page.get_by_role("textbox", name="Enter URLs")
+                urls_textbox.wait_for(timeout=5_000, state="visible")
+            except Exception:
+                # Both patterns failed
+                raise NotebookLMError(
+                    "Could not find URLs textbox in the dialog. "
+                    "Tried both 'Paste URLs' and 'Enter URLs' but none worked."
+                )
+
         urls_textbox.click()
         page.wait_for_timeout(300)
 
