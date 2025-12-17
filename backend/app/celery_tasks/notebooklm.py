@@ -28,6 +28,7 @@ from app.automation.tasks.notebooklm.report import create_report
 from app.automation.tasks.notebooklm.slide_deck import create_slide_deck
 from app.automation.tasks.notebooklm.sources import (
     add_source_to_notebook,
+    add_url_source_to_notebook,
     delete_source,
     list_sources,
     rename_source,
@@ -183,6 +184,16 @@ def add_source_task(
     """Add a source file to a notebook."""
     return _run_with_browser(
         add_source_to_notebook, headless, profile, notebook_id, file_path
+    )
+
+
+@celery_app.task(name="notebooklm.add_url_source")
+def add_url_source_task(
+    notebook_id: str, urls: str, headless: bool, profile: str
+) -> Dict[str, Any]:
+    """Add URL sources to a notebook."""
+    return _run_with_browser(
+        add_url_source_to_notebook, headless, profile, notebook_id, urls
     )
 
 

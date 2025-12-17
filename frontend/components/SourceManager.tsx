@@ -19,6 +19,9 @@ export default function SourceManager({
   loading = false,
 }: SourceManagerProps) {
   const [uploading, setUploading] = useState(false);
+  const [addingUrls, setAddingUrls] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [urls, setUrls] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renamingSubmitting, setRenamingSubmitting] = useState<string | null>(null);
@@ -27,17 +30,26 @@ export default function SourceManager({
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setSelectedFile(file);
+      setError('');
+      setInfo('');
+    }
+    e.target.value = ''; // Reset input to allow selecting the same file again
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
 
     try {
       setUploading(true);
       setError('');
       setInfo('');
-      const status = await sourceApi.upload(notebookId, file);
+      const status = await sourceApi.upload(notebookId, selectedFile);
       setInfo(status.message || 'Upload submitted. Processing...');
-      e.target.value = ''; // Reset input
+      setSelectedFile(null);
       // Small delay before reloading to allow processing
       await new Promise(resolve => setTimeout(resolve, 1000));
       // Reload sources after upload
@@ -48,6 +60,32 @@ export default function SourceManager({
       console.error('Upload error:', err);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleAddUrls = async () => {
+    if (!urls.trim()) {
+      setError('Please enter at least one URL');
+      return;
+    }
+
+    try {
+      setAddingUrls(true);
+      setError('');
+      setInfo('');
+      const status = await sourceApi.addUrls(notebookId, urls.trim());
+      setInfo(status.message || 'URLs submitted. Processing...');
+      setUrls('');
+      // Small delay before reloading to allow processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Reload sources after adding URLs
+      await onSourcesChange();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to add URL sources';
+      setError(errorMessage);
+      console.error('Add URLs error:', err);
+    } finally {
+      setAddingUrls(false);
     }
   };
 
@@ -124,18 +162,70 @@ export default function SourceManager({
       {/* Upload Section */}
       <div className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-xl font-semibold text-gray-900">Upload Source</h2>
-        <label className="block">
-          <span className="sr-only">Choose file</span>
-          <input
-            type="file"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
+        <div className="space-y-4">
+          <label className="block">
+            <span className="sr-only">Choose file</span>
+            <input
+              type="file"
+              onChange={handleFileSelect}
+              disabled={uploading}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
+            />
+          </label>
+          {selectedFile && (
+            <div className="flex items-center justify-between rounded-md border border-gray-300 bg-gray-50 p-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                <p className="text-xs text-gray-500">
+                  {(selectedFile.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedFile(null)}
+                  disabled={uploading}
+                  className="rounded-md bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleFileUpload}
+                  disabled={uploading}
+                  className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add URLs Section */}
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h2 className="mb-4 text-xl font-semibold text-gray-900">Add URL Sources</h2>
+        <div className="space-y-4">
+          <textarea
+            value={urls}
+            onChange={(e) => setUrls(e.target.value)}
+            placeholder="Paste URLs here, one per line or separated by spaces&#10;Example:&#10;https://example.com/page1&#10;https://example.com/page2"
+            disabled={addingUrls}
+            rows={6}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
           />
-        </label>
-        {uploading && (
-          <p className="mt-2 text-sm text-gray-600">Uploading...</p>
-        )}
+          <div className="flex items-center justify-end">
+            <button
+              onClick={handleAddUrls}
+              disabled={addingUrls || !urls.trim()}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {addingUrls ? 'Adding...' : 'Add URLs'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            To add multiple URLs, separate them with a new line or space.
+          </p>
+        </div>
       </div>
 
       {/* Sources List */}

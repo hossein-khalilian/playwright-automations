@@ -9,6 +9,84 @@ from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.automation.tasks.notebooklm.helpers import close_dialogs, navigate_to_notebook
 
 
+def add_url_source_to_notebook(
+    page: Page, notebook_id: str, urls: str
+) -> Dict[str, str]:
+    """
+    Add source URLs to a notebook.
+
+    Args:
+        page: The Playwright Page object
+        notebook_id: The ID of the notebook
+        urls: URLs to add, separated by newlines or spaces
+
+    Returns:
+        Dictionary with status and message
+
+    Raises:
+        NotebookLMError: If adding source fails
+    """
+    try:
+        navigate_to_notebook(page, notebook_id)
+        page.wait_for_timeout(1_000)
+
+        # Always start from a clean state
+        close_dialogs(page)
+
+        # Click "Add source" button
+        add_source_button = page.get_by_role("button", name=re.compile("^Add source$", re.IGNORECASE))
+        add_source_button.wait_for(timeout=10_000, state="visible")
+        add_source_button.click()
+        page.wait_for_timeout(500)
+
+        # Click "Website" option in the dialog
+        website_button = page.get_by_text("Website")
+        website_button.wait_for(timeout=5_000, state="visible")
+        website_button.click()
+        page.wait_for_timeout(500)
+
+        # Find and fill the "Paste URLs" textbox
+        urls_textbox = page.get_by_role("textbox", name="Paste URLs")
+        urls_textbox.wait_for(timeout=5_000, state="visible")
+        urls_textbox.click()
+        page.wait_for_timeout(300)
+
+        # Fill in the URLs (separated by newlines)
+        urls_textbox.fill(urls)
+        page.wait_for_timeout(500)
+
+        # Click "Insert" button - wait for it to be enabled
+        insert_button = page.get_by_role("button", name="Insert")
+        insert_button.wait_for(timeout=5_000, state="visible")
+        
+        # Wait for button to be enabled (it starts disabled until URLs are entered)
+        # Poll until button is enabled or timeout
+        max_wait_time = 10_000  # 10 seconds max wait
+        wait_interval = 200  # Check every 200ms
+        waited = 0
+        while waited < max_wait_time:
+            try:
+                if not insert_button.is_disabled():
+                    break
+            except Exception:
+                # If we can't check disabled state, assume it's ready
+                break
+            page.wait_for_timeout(wait_interval)
+            waited += wait_interval
+        
+        insert_button.click()
+        page.wait_for_timeout(2_000)
+
+        return {
+            "status": "success",
+            "message": f"URL sources added to notebook {notebook_id}.",
+        }
+    except NotebookLMError:
+        raise
+    except Exception as exc:
+        raise NotebookLMError(f"Failed to add URL sources: {exc}") from exc
+
+
 def add_source_to_notebook(
     page: Page, notebook_id: str, file_path: str
 ) -> Dict[str, str]:

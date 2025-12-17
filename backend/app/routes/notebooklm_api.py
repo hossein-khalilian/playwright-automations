@@ -12,6 +12,7 @@ from app.auth import CurrentUser
 from app.celery_app import celery_app
 from app.celery_tasks.notebooklm import (
     add_source_task,
+    add_url_source_task,
     create_audio_overview_task,
     create_flashcards_task,
     create_infographic_task,
@@ -49,6 +50,7 @@ from app.models import (
     SourceRenameRequest,
     TaskStatusResponse,
     TaskSubmissionResponse,
+    UrlSourceAddRequest,
     VideoOverviewCreateRequest,
 )
 from app.utils.db import get_notebooks_by_user
@@ -195,6 +197,23 @@ def upload_source_endpoint(
             detail=f"Failed to store upload: {exc}",
         )
     return _submit(add_source_task, notebook_id, tmp_path, _headless(), _profile())
+
+
+@router.post(
+    "/notebooks/{notebook_id}/sources/urls",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Sources"],
+)
+def add_url_source_endpoint(
+    notebook_id: str,
+    payload: UrlSourceAddRequest,
+    current_user: CurrentUser,
+) -> TaskSubmissionResponse:
+    """Add URL sources to a notebook."""
+    return _submit(
+        add_url_source_task, notebook_id, payload.urls, _headless(), _profile()
+    )
 
 
 @router.delete(

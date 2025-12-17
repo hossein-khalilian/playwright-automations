@@ -41,6 +41,7 @@ import type {
   SourceReviewResponse,
   TaskSubmissionResponse,
   TaskStatusResponse,
+  UrlSourceAddRequest,
 } from './types';
 
 type TaskWaitOptions = {
@@ -197,6 +198,22 @@ export const sourceApi = {
         .then((res) => res.data),
       undefined,
       { label: `Upload source: ${file.name}`, type: 'source.upload', notebookId }
+    );
+  },
+
+  addUrls: async (
+    notebookId: string,
+    urls: string
+  ): Promise<TaskStatusResponse<SourceUploadResponse>> => {
+    return submitTask<SourceUploadResponse>(() =>
+      api
+        .post<TaskSubmissionResponse>(
+          `/notebooklm/notebooks/${notebookId}/sources/urls`,
+          { urls } as UrlSourceAddRequest
+        )
+        .then((res) => res.data),
+      undefined,
+      { label: 'Add URL sources', type: 'source.add_urls', notebookId }
     );
   },
 

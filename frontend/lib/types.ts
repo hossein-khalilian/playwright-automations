@@ -86,6 +86,10 @@ export interface SourceRenameRequest {
   new_name: string;
 }
 
+export interface UrlSourceAddRequest {
+  urls: string;
+}
+
 // Chat types
 export interface ChatMessage {
   role: string;

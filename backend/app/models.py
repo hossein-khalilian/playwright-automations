@@ -120,6 +120,10 @@ class SourceRenameRequest(BaseModel):
     new_name: str = Field(description="The new name for the source")
 
 
+class UrlSourceAddRequest(BaseModel):
+    urls: str = Field(description="URLs to add as sources, separated by newlines or spaces")
+
+
 class SourceRenameResponse(BaseModel):
     status: str = Field(description="Status of the rename operation")
     message: str = Field(description="Message describing the result")
