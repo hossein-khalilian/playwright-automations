@@ -1,5 +1,12 @@
 import api from './api';
 import { retryWithBackoff } from './retry';
+import {
+  clearCompletedTasks,
+  trackTaskFailure,
+  trackTaskStart,
+  trackTaskSuccess,
+  type TrackedTaskMeta,
+} from './task-tracker';
 import type {
   ArtifactListResponse,
   AudioOverviewCreateRequest,
@@ -84,13 +91,28 @@ async function waitForTaskResult<T = any>(
 
 async function submitTask<T = any>(
   submitFn: () => Promise<TaskSubmissionResponse>,
-  options?: TaskWaitOptions
+  options?: TaskWaitOptions,
+  meta?: TrackedTaskMeta
 ): Promise<TaskStatusResponse<T>> {
   const submission = await submitFn();
   if (!submission?.task_id) {
     throw new Error('Task submission did not return a task_id');
   }
-  return waitForTaskResult<T>(submission.task_id, options);
+  const taskId = submission.task_id;
+
+  // Track task lifecycle for UI.
+  trackTaskStart(taskId, meta);
+
+  try {
+    const status = await waitForTaskResult<T>(taskId, options);
+    trackTaskSuccess(taskId, status.message);
+    return status;
+  } catch (error: any) {
+    const errorMessage =
+      error?.response?.data?.detail || error?.message || 'Task failed';
+    trackTaskFailure(taskId, errorMessage);
+    throw error;
+  }
 }
 
 // Auth API
@@ -120,7 +142,12 @@ export const notebookApi = {
 
   create: async (): Promise<TaskStatusResponse<NotebookCreateResponse>> => {
     return submitTask<NotebookCreateResponse>(
-      () => api.post<TaskSubmissionResponse>('/notebooklm/notebooks').then((res) => res.data)
+      () =>
+        api
+          .post<TaskSubmissionResponse>('/notebooklm/notebooks')
+          .then((res) => res.data),
+      undefined,
+      { label: 'Create notebook', type: 'notebook.create' }
     );
   },
 
@@ -132,6 +159,9 @@ export const notebookApi = {
         api
           .delete<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}`)
           .then((res) => res.data)
+      ,
+      undefined,
+      { label: 'Delete notebook', type: 'notebook.delete', notebookId }
     );
   },
 };
@@ -144,6 +174,9 @@ export const sourceApi = {
         api
           .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/sources`)
           .then((res) => res.data)
+        ,
+        undefined,
+        { label: 'List sources', type: 'source.list', notebookId }
       )
     );
     return ensureResult(status);
@@ -161,7 +194,9 @@ export const sourceApi = {
             headers: { 'Content-Type': 'multipart/form-data' },
           }
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Upload source: ${file.name}`, type: 'source.upload', notebookId }
     );
   },
 
@@ -174,7 +209,9 @@ export const sourceApi = {
         .delete<TaskSubmissionResponse>(
           `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}`
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Delete source: ${sourceName}`, type: 'source.delete', notebookId }
     );
   },
 
@@ -189,7 +226,9 @@ export const sourceApi = {
           `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/rename`,
           { new_name: newName } as SourceRenameRequest
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Rename source: ${sourceName}`, type: 'source.rename', notebookId }
     );
   },
 
@@ -202,7 +241,9 @@ export const sourceApi = {
         .post<TaskSubmissionResponse>(
           `/notebooklm/notebooks/${notebookId}/sources/${encodeURIComponent(sourceName)}/review`
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Review source: ${sourceName}`, type: 'source.review', notebookId }
     );
   },
 };
@@ -215,6 +256,9 @@ export const chatApi = {
         api
           .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/chat`)
           .then((res) => res.data)
+        ,
+        undefined,
+        { label: 'Load chat history', type: 'chat.history', notebookId }
       )
     );
     return ensureResult(status);
@@ -234,7 +278,8 @@ export const chatApi = {
       {
         pollIntervalMs: 2000,
         maxAttempts: 80,
-      }
+      },
+      { label: 'Notebook query', type: 'chat.query', notebookId }
     );
   },
 
@@ -244,7 +289,9 @@ export const chatApi = {
     return submitTask(() =>
       api
         .delete<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/chat`)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Delete chat history', type: 'chat.delete', notebookId }
     );
   },
 };
@@ -257,6 +304,9 @@ export const artifactApi = {
         api
           .get<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/artifacts`)
           .then((res) => res.data)
+        ,
+        undefined,
+        { label: 'List artifacts', type: 'artifact.list', notebookId }
       )
     );
     const result = ensureResult(status);
@@ -278,7 +328,9 @@ export const artifactApi = {
         .delete<TaskSubmissionResponse>(
           `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}`
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Delete artifact: ${artifactName}`, type: 'artifact.delete', notebookId }
     );
   },
 
@@ -293,7 +345,9 @@ export const artifactApi = {
           `/notebooklm/notebooks/${notebookId}/artifacts/${encodeURIComponent(artifactName)}/rename`,
           { new_name: newName }
         )
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: `Rename artifact: ${artifactName}`, type: 'artifact.rename', notebookId }
     );
   },
 
@@ -394,7 +448,9 @@ export const artifactApi = {
     return submitTask<AudioOverviewCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/audio_overview`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Audio Overview', type: 'artifact.audio_overview', notebookId }
     );
   },
 
@@ -405,7 +461,9 @@ export const artifactApi = {
     return submitTask<VideoOverviewCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/video_overview`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Video Overview', type: 'artifact.video_overview', notebookId }
     );
   },
 
@@ -416,7 +474,9 @@ export const artifactApi = {
     return submitTask<FlashcardCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/flashcards`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Flashcards', type: 'artifact.flashcards', notebookId }
     );
   },
 
@@ -427,7 +487,9 @@ export const artifactApi = {
     return submitTask<QuizCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/quiz`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Quiz', type: 'artifact.quiz', notebookId }
     );
   },
 
@@ -438,7 +500,9 @@ export const artifactApi = {
     return submitTask<InfographicCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/infographic`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Infographic', type: 'artifact.infographic', notebookId }
     );
   },
 
@@ -449,7 +513,9 @@ export const artifactApi = {
     return submitTask<SlideDeckCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/slide_deck`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Slide Deck', type: 'artifact.slide_deck', notebookId }
     );
   },
 
@@ -460,7 +526,9 @@ export const artifactApi = {
     return submitTask<ReportCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/report`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Report', type: 'artifact.report', notebookId }
     );
   },
 
@@ -471,7 +539,9 @@ export const artifactApi = {
     return submitTask<MindmapCreateResponse>(() =>
       api
         .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/mindmap`, data)
-        .then((res) => res.data)
+        .then((res) => res.data),
+      undefined,
+      { label: 'Create Mind Map', type: 'artifact.mindmap', notebookId }
     );
   },
 };

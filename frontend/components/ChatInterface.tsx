@@ -21,6 +21,7 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const [query, setQuery] = useState('');
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +109,7 @@ export default function ChatInterface({
     }
 
     try {
+      setDeleting(true);
       setError('');
       await chatApi.deleteHistory(notebookId);
       onMessagesChange();
@@ -115,6 +117,8 @@ export default function ChatInterface({
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete chat history';
       setError(errorMessage);
       console.error('Delete history error:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -156,9 +160,17 @@ export default function ChatInterface({
           </button>
           <button
             onClick={handleDeleteHistory}
-            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500"
+            disabled={deleting || loading || sending}
+            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
           >
-            Clear History
+            {deleting ? (
+              <>
+                <div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
+                <span>Deleting...</span>
+              </>
+            ) : (
+              <span>Clear History</span>
+            )}
           </button>
         </div>
       </div>
