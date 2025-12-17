@@ -138,3 +138,55 @@ def extract_notebook_id_from_url(page: Page) -> Optional[str]:
     """
     match = re.search(r"/notebook/([^/?]+)", page.url)
     return match.group(1) if match else None
+
+
+def check_generation_limits(page: Page, feature_name: str) -> None:
+    """
+    Check if a "daily limit reached" upsell message is shown after triggering generation.
+
+    The UI shows messages like:
+        "You have reached your daily Audio Overview limits, come back later."
+
+    If such a message is visible, this function raises NotebookLMError with the
+    extracted text so the caller can surface a clear error to the frontend.
+
+    Args:
+        page: The Playwright Page object
+        feature_name: Human-readable name of the feature (for fallback message)
+
+    Raises:
+        NotebookLMError: When a daily limit / upsell message is detected
+    """
+    try:
+        # Primary detection: look for the generic daily-limit text.
+        limit_locator = page.get_by_text(
+            re.compile(r"You have reached your daily", re.IGNORECASE)
+        )
+
+        if limit_locator.count() > 0:
+            # Prefer the first visible occurrence.
+            first = limit_locator.first
+            try:
+                first.wait_for(timeout=2_000, state="visible")
+            except PlaywrightTimeoutError:
+                # Not visible; treat as not present.
+                return
+
+            text = (first.text_content() or "").strip()
+            if text:
+                raise NotebookLMError(text)
+
+        # Fallback: look for the upsell container explicitly, if present.
+        upsell_container = page.locator(".upsell-message-container")
+        if upsell_container.count() > 0:
+            # Try to get any text content inside the container.
+            text = (upsell_container.first.text_content() or "").strip()
+            if text:
+                raise NotebookLMError(text)
+
+    except NotebookLMError:
+        # Re-raise NotebookLMError so callers receive the precise message.
+        raise
+    except Exception:
+        # Any failure to detect upsell should not break the main flow.
+        return

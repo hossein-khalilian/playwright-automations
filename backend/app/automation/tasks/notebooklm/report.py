@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from playwright.sync_api import Page
 
 from app.automation.tasks.notebooklm.exceptions import NotebookLMError
+from app.automation.tasks.notebooklm.helpers import check_generation_limits
 
 
 def create_report(
@@ -154,6 +155,9 @@ def create_report(
         generate_button.wait_for(timeout=10_000, state="visible")
         generate_button.click()
         page.wait_for_timeout(2_000)
+
+        # After clicking Generate, check if a daily limit / upsell message appeared.
+        check_generation_limits(page, "Report")
 
         return {
             "status": "success",

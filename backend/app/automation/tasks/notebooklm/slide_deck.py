@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from playwright.sync_api import Page
 
 from app.automation.tasks.notebooklm.exceptions import NotebookLMError
+from app.automation.tasks.notebooklm.helpers import check_generation_limits
 
 
 def create_slide_deck(
@@ -56,6 +57,10 @@ def create_slide_deck(
         generate_button.wait_for(timeout=5_000, state="visible")
         generate_button.click()
         page.wait_for_timeout(2_000)
+
+        # After clicking Generate, check if a daily limit / upsell message appeared.
+        check_generation_limits(page, "Slide deck")
+
         return {
             "status": "success",
             "message": f"Slide deck creation started for {notebook_id}.",
