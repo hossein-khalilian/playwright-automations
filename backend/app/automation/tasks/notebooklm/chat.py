@@ -129,22 +129,28 @@ def delete_chat_history(page: Page, notebook_id: str) -> Dict[str, str]:
         navigate_to_notebook(page, notebook_id)
         close_dialogs(page)
         page.wait_for_timeout(1_000)
+        
+        # Wait for the chat panel to be visible (check for "Chat" header)
+        page.get_by_text("Chat", exact=True).wait_for(timeout=10_000, state="visible")
+        
+        # Click the "Chat options" button
         chat_options_button = page.get_by_role("button", name="Chat options")
-        chat_options_button.wait_for(timeout=10_000)
+        chat_options_button.wait_for(timeout=10_000, state="visible")
         chat_options_button.click()
         page.wait_for_timeout(500)
-        delete_button = page.get_by_role(
-            "menuitem", name=re.compile("Delete chat", re.IGNORECASE)
-        )
-        delete_button.wait_for(timeout=5_000)
-        delete_button.click()
+        
+        # Click the "Delete chat history Chat" menuitem (exact match from codegen)
+        delete_menuitem = page.get_by_role("menuitem", name="Delete chat history Chat")
+        delete_menuitem.wait_for(timeout=5_000, state="visible")
+        delete_menuitem.click()
         page.wait_for_timeout(500)
-        confirm_button = page.get_by_role(
-            "button", name=re.compile("Delete", re.IGNORECASE)
-        )
-        confirm_button.wait_for(timeout=5_000)
+        
+        # Click the "Delete" confirmation button
+        confirm_button = page.get_by_role("button", name="Delete")
+        confirm_button.wait_for(timeout=5_000, state="visible")
         confirm_button.click()
         page.wait_for_timeout(1_000)
+        
         return {
             "status": "success",
             "message": f"Chat history deleted for {notebook_id}.",
