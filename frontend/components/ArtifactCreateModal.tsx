@@ -14,6 +14,22 @@ import type {
   AudioLanguage,
   MindmapCreateRequest,
 } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface ArtifactCreateModalProps {
   notebookId: string;
@@ -234,53 +250,48 @@ export default function ArtifactCreateModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
-                <select
+                <Label>Choose language</Label>
+                <Select
                   value={audioLanguage}
-                  onChange={(e) => setAudioLanguage(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
+                  onValueChange={setAudioLanguage}
                 >
-                  <option value="english">English</option>
-                  <option value="persian">Persian</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="english">English</SelectItem>
+                    <SelectItem value="persian">Persian</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {audioFormat === 'Deep Dive' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setAudioLength('Short')}
-                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                        audioLength === 'Short'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
+                      variant={audioLength === 'Short' ? 'default' : 'outline'}
+                      className="flex-1"
                     >
                       Short
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => setAudioLength('Default')}
-                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                        audioLength === 'Default'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
+                      variant={audioLength === 'Default' ? 'default' : 'outline'}
+                      className="flex-1"
                     >
                       Default
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => setAudioLength('Long')}
-                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                        audioLength === 'Long'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
+                      variant={audioLength === 'Long' ? 'default' : 'outline'}
+                      className="flex-1"
                     >
                       Long
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -316,8 +327,8 @@ export default function ArtifactCreateModal({
               {audioFormat === 'Brief' && <div></div>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What should the AI hosts focus on in this episode?</label>
-              <textarea
+              <Label>What should the AI hosts focus on in this episode?</Label>
+              <Textarea
                 value={focusText}
                 onChange={(e) => setFocusText(e.target.value)}
                 rows={3}
@@ -327,7 +338,6 @@ export default function ArtifactCreateModal({
  • Focus on a specific source ("only cover the article about Italy")
  • Focus on a specific topic ("just discuss the novel's main character")
  • Target a specific audience ("explain to someone new to biology")`}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
           </>
@@ -947,64 +957,46 @@ export default function ArtifactCreateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={onClose}
-        ></div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>{getTitle()}</DialogTitle>
+          </DialogHeader>
 
-        <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle">
-          <form onSubmit={handleSubmit}>
-            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">{getTitle()}</h3>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-              {error && (
-                <div className="mb-4 rounded-md bg-red-50 p-4">
-                  <div className="text-sm text-red-800">{error}</div>
-                </div>
+          <div className="space-y-4 py-4">{renderForm()}</div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create'
               )}
-
-              <div className="space-y-4">{renderForm()}</div>
-            </div>
-
-            <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto disabled:opacity-50"
-              >
-                {loading ? 'Creating...' : 'Create'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

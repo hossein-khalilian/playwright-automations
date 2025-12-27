@@ -5,6 +5,11 @@ import { chatApi } from '@/lib/api-client';
 import type { ChatMessage } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
 import { getTextDirection } from '@/lib/rtl-utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
 
 interface ChatInterfaceProps {
   notebookId: string;
@@ -123,67 +128,59 @@ export default function ChatInterface({
   };
 
   return (
-    <div className="flex h-[600px] flex-col rounded-lg bg-white shadow">
+    <Card className="flex h-[600px] flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <div className="flex items-center space-x-2">
-          <h2 className="text-xl font-semibold text-gray-900">Chat</h2>
+          <CardTitle>Chat</CardTitle>
           {loading && (
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
               <span>Loading...</span>
             </div>
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <button
+          <Button
             onClick={onMessagesChange}
             disabled={loading || sending}
-            className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
+            variant="outline"
+            size="sm"
             title="Reload chat history"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            <span>Reload</span>
-          </button>
-          <button
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Reload
+          </Button>
+          <Button
             onClick={handleDeleteHistory}
             disabled={deleting || loading || sending}
-            className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            variant="destructive"
+            size="sm"
           >
             {deleting ? (
               <>
-                <div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                <span>Deleting...</span>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Deleting...
               </>
             ) : (
-              <span>Clear History</span>
+              <>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Clear History
+              </>
             )}
-          </button>
+          </Button>
         </div>
-      </div>
+      </CardHeader>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <CardContent className="flex-1 overflow-y-auto space-y-4">
         {loading && messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
+          <div className="text-center text-muted-foreground py-8">
+            <Loader2 className="inline-block h-8 w-8 animate-spin" />
             <p className="mt-4">Loading chat history...</p>
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-muted-foreground py-8">
             No messages yet. Start a conversation!
           </div>
         ) : (
@@ -197,15 +194,15 @@ export default function ChatInterface({
                 <div
                   className={`max-w-[80%] rounded-lg px-4 py-2 ${
                     message.role === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-foreground'
                   }`}
                   dir={messageRTL}
                 >
                   <div className={`prose prose-sm max-w-none ${
                     message.role === 'user' 
-                      ? 'prose-invert prose-headings:text-white prose-p:text-white prose-strong:text-white prose-ul:text-white prose-ol:text-white prose-li:text-white'
-                      : 'prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900'
+                      ? 'prose-invert prose-headings:text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-ul:text-primary-foreground prose-ol:text-primary-foreground prose-li:text-primary-foreground'
+                      : 'prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground'
                   }`}>
                     <ReactMarkdown>
                       {message.content}
@@ -217,50 +214,49 @@ export default function ChatInterface({
           })
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </CardContent>
 
       {/* Input */}
       {error && (
         <div className="px-6 py-2">
-          <div className="rounded-md bg-red-50 p-2">
-            <div className="text-xs text-red-800">{error}</div>
-          </div>
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
         </div>
       )}
 
-      <form onSubmit={handleSend} className="border-t border-gray-200 px-6 py-4">
+      <form onSubmit={handleSend} className="border-t px-6 py-4">
         <div className="flex space-x-2">
-          <input
+          <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask a question..."
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             dir={queryRTL}
             disabled={sending || loading}
+            className="flex-1"
           />
-          <button
+          <Button
             type="submit"
             disabled={sending || !query.trim() || loading}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-2"
           >
             {sending ? (
               <>
-                <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                <span>Sending...</span>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sending...
               </>
             ) : (
-              <span>Send</span>
+              'Send'
             )}
-          </button>
+          </Button>
         </div>
         {sending && (
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             This may take a while. Please wait...
           </p>
         )}
       </form>
-    </div>
+    </Card>
   );
 }
 

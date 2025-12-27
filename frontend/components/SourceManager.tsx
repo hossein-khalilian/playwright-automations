@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { sourceApi } from '@/lib/api-client';
 import type { Source } from '@/lib/types';
 import SourceReviewModal from './SourceReviewModal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, RefreshCw, Trash2, FileEdit, Eye } from 'lucide-react';
 
 interface SourceManagerProps {
   notebookId: string;
@@ -135,233 +142,254 @@ export default function SourceManager({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ready':
-        return 'bg-green-100 text-green-800';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="text-sm text-red-800">{error}</div>
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       {info && !error && (
-        <div className="rounded-md bg-blue-50 p-4">
-          <div className="text-sm text-blue-800">{info}</div>
-        </div>
+        <Alert>
+          <AlertDescription>{info}</AlertDescription>
+        </Alert>
       )}
 
       {/* Upload Section */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">Upload Source</h2>
-        <div className="space-y-4">
-          <label className="block">
-            <span className="sr-only">Choose file</span>
-            <input
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Source</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Input
               type="file"
               onChange={handleFileSelect}
               disabled={uploading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
             />
-          </label>
+          </div>
           {selectedFile && (
-            <div className="flex items-center justify-between rounded-md border border-gray-300 bg-gray-50 p-3">
+            <div className="flex items-center justify-between rounded-md border bg-muted p-3">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {(selectedFile.size / 1024).toFixed(2)} KB
                 </p>
               </div>
               <div className="flex items-center space-x-2">
-                <button
+                <Button
                   onClick={() => setSelectedFile(null)}
                   disabled={uploading}
-                  className="rounded-md bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                  variant="outline"
+                  size="sm"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleFileUpload}
                   disabled={uploading}
-                  className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                  size="sm"
                 >
-                  {uploading ? 'Uploading...' : 'Upload'}
-                </button>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    'Upload'
+                  )}
+                </Button>
               </div>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Add URLs Section */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">Add URL Sources</h2>
-        <div className="space-y-4">
-          <textarea
+      <Card>
+        <CardHeader>
+          <CardTitle>Add URL Sources</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
             placeholder="Paste URLs here, one per line or separated by spaces&#10;Example:&#10;https://example.com/page1&#10;https://example.com/page2"
             disabled={addingUrls}
             rows={6}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
           />
           <div className="flex items-center justify-end">
-            <button
+            <Button
               onClick={handleAddUrls}
               disabled={addingUrls || !urls.trim()}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
             >
-              {addingUrls ? 'Adding...' : 'Add URLs'}
-            </button>
+              {addingUrls ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add URLs'
+              )}
+            </Button>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             To add multiple URLs, separate them with a new line or space.
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Sources List */}
-      <div className="rounded-lg bg-white shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Sources</h2>
+            <CardTitle>Sources</CardTitle>
             <div className="flex items-center space-x-2">
               {loading && (
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading...</span>
                 </div>
               )}
-              <button
+              <Button
                 onClick={onSourcesChange}
                 disabled={loading}
-                className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
+                variant="outline"
+                size="sm"
                 title="Reload sources"
               >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                <span>Reload</span>
-              </button>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Reload
+              </Button>
             </div>
           </div>
-        </div>
-        {loading && sources.length === 0 ? (
-          <div className="p-6 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading sources...</p>
-          </div>
-        ) : sources.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No sources uploaded yet. Upload a file to get started.
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {sources.map((source) => (
-              <li key={source.name} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <h3 className="text-sm font-medium text-gray-900">{source.name}</h3>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(
-                          source.status
-                        )}`}
-                      >
-                        {source.status}
-                      </span>
+        </CardHeader>
+        <CardContent>
+          {loading && sources.length === 0 ? (
+            <div className="text-center py-8">
+              <Loader2 className="inline-block h-8 w-8 animate-spin" />
+              <p className="mt-4 text-muted-foreground">Loading sources...</p>
+            </div>
+          ) : sources.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              No sources uploaded yet. Upload a file to get started.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {sources.map((source) => (
+                <li key={source.name} className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-sm font-medium text-foreground">{source.name}</h3>
+                        <Badge
+                          variant={
+                            source.status === 'ready'
+                              ? 'default'
+                              : source.status === 'processing'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                        >
+                          {source.status}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {renaming === source.name ? (
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="text"
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          disabled={renamingSubmitting === source.name}
-                          className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                          placeholder="New name"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleRename(source.name);
-                            } else if (e.key === 'Escape') {
+                    <div className="flex items-center space-x-2">
+                      {renaming === source.name ? (
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            disabled={renamingSubmitting === source.name}
+                            placeholder="New name"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleRename(source.name);
+                              } else if (e.key === 'Escape') {
+                                setRenaming(null);
+                                setNewName('');
+                              }
+                            }}
+                            className="w-32"
+                          />
+                          <Button
+                            onClick={() => handleRename(source.name)}
+                            disabled={renamingSubmitting === source.name}
+                            size="sm"
+                          >
+                            {renamingSubmitting === source.name ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              'Save'
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => {
                               setRenaming(null);
                               setNewName('');
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={() => handleRename(source.name)}
-                          disabled={renamingSubmitting === source.name}
-                          className="rounded-md bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-500 disabled:opacity-50"
-                        >
-                          {renamingSubmitting === source.name ? 'Saving...' : 'Save'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRenaming(null);
-                            setNewName('');
-                          }}
-                          disabled={renamingSubmitting === source.name}
-                          className="rounded-md bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setSelectedSource(source.name)}
-                          className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500"
-                        >
-                          Review
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRenaming(source.name);
-                            setNewName(source.name);
-                          }}
-                          className="rounded-md bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          onClick={() => handleDelete(source.name)}
-                          disabled={deleting === source.name}
-                          className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
-                        >
-                          {deleting === source.name ? 'Deleting...' : 'Delete'}
-                        </button>
-                      </>
-                    )}
+                            }}
+                            disabled={renamingSubmitting === source.name}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={() => setSelectedSource(source.name)}
+                            size="sm"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Review
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setRenaming(source.name);
+                              setNewName(source.name);
+                            }}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <FileEdit className="h-4 w-4 mr-1" />
+                            Rename
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(source.name)}
+                            disabled={deleting === source.name}
+                            variant="destructive"
+                            size="sm"
+                          >
+                            {deleting === source.name ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {selectedSource && (
         <SourceReviewModal

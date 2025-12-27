@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { artifactApi } from '@/lib/api-client';
 import type { ArtifactInfo } from '@/lib/types';
 import ArtifactCreateModal from './ArtifactCreateModal';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, RefreshCw, Trash2, Download } from 'lucide-react';
 
 interface ArtifactManagerProps {
   notebookId: string;
@@ -64,18 +69,6 @@ export default function ArtifactManager({
     }
   };
 
-  const getStatusColor = (status: string, isGenerating: boolean) => {
-    if (isGenerating) {
-      return 'bg-yellow-100 text-yellow-800';
-    }
-    switch (status) {
-      case 'ready':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const artifactTypes = [
     { id: 'audio-overview', label: 'Audio Overview' },
     { id: 'video-overview', label: 'Video Overview' },
@@ -90,154 +83,165 @@ export default function ArtifactManager({
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="text-sm text-red-800">{error}</div>
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       {info && !error && (
-        <div className="rounded-md bg-blue-50 p-4">
-          <div className="text-sm text-blue-800">{info}</div>
-        </div>
+        <Alert>
+          <AlertDescription>{info}</AlertDescription>
+        </Alert>
       )}
 
       {/* Create Artifact Section */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">Create Artifact</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {artifactTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => setCreateType(type.id)}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {type.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Artifact</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {artifactTypes.map((type) => (
+              <Button
+                key={type.id}
+                onClick={() => setCreateType(type.id)}
+                variant="outline"
+              >
+                {type.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Artifacts List */}
-      <div className="rounded-lg bg-white shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Artifacts</h2>
+            <CardTitle>Artifacts</CardTitle>
             <div className="flex items-center space-x-2">
               {loading && (
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading...</span>
                 </div>
               )}
-              <button
+              <Button
                 onClick={onArtifactsChange}
                 disabled={loading}
-                className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
+                variant="outline"
+                size="sm"
                 title="Reload artifacts"
               >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                <span>Reload</span>
-              </button>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Reload
+              </Button>
             </div>
           </div>
-        </div>
-        {loading && artifacts.length === 0 ? (
-          <div className="p-6 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading artifacts...</p>
-          </div>
-        ) : artifacts.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No artifacts created yet. Create an artifact to get started.
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {artifacts.map((artifact, idx) => (
-              <li key={idx} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {artifact.name || `Artifact ${idx + 1}`}
-                      </h3>
-                      {artifact.type && (
-                        <span className="text-xs text-gray-500">({artifact.type})</span>
+        </CardHeader>
+        <CardContent>
+          {loading && artifacts.length === 0 ? (
+            <div className="text-center py-8">
+              <Loader2 className="inline-block h-8 w-8 animate-spin" />
+              <p className="mt-4 text-muted-foreground">Loading artifacts...</p>
+            </div>
+          ) : artifacts.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              No artifacts created yet. Create an artifact to get started.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {artifacts.map((artifact, idx) => (
+                <li key={idx} className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-sm font-medium text-foreground">
+                          {artifact.name || `Artifact ${idx + 1}`}
+                        </h3>
+                        {artifact.type && (
+                          <span className="text-xs text-muted-foreground">({artifact.type})</span>
+                        )}
+                        <Badge
+                          variant={
+                            artifact.is_generating
+                              ? 'secondary'
+                              : artifact.status === 'ready'
+                              ? 'default'
+                              : 'outline'
+                          }
+                        >
+                          {artifact.is_generating ? 'Generating...' : artifact.status}
+                        </Badge>
+                      </div>
+                      {artifact.details && (
+                        <p className="mt-1 text-xs text-muted-foreground">{artifact.details}</p>
                       )}
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(
-                          artifact.status,
-                          artifact.is_generating
-                        )}`}
-                      >
-                        {artifact.is_generating ? 'Generating...' : artifact.status}
-                      </span>
                     </div>
-                    {artifact.details && (
-                      <p className="mt-1 text-xs text-gray-500">{artifact.details}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
-                    {/* Note: Play button removed for audio/video - they use download instead */}
-                    {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
-                      <button
-                        onClick={() => handleDownload(artifact.name || '')}
-                        className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center space-x-1"
-                        disabled={downloading === artifact.name}
-                        title={
-                          artifact.type === 'mind_map'
-                            ? 'Download mindmap'
-                            : artifact.type === 'video_overview'
-                            ? 'Download video'
-                            : artifact.type === 'audio_overview'
-                            ? 'Download audio'
-                            : artifact.type === 'infographic'
-                            ? 'Download infographic'
-                            : artifact.type === 'flashcards'
-                            ? 'Download flashcards'
-                            : artifact.type === 'slide_deck'
-                            ? 'Download slide deck'
-                            : artifact.type === 'reports'
-                            ? 'Download report'
-                            : 'Download artifact'
-                        }
+                    <div className="flex items-center space-x-2">
+                      {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
+                      {/* Note: Play button removed for audio/video - they use download instead */}
+                      {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
+                        <Button
+                          onClick={() => handleDownload(artifact.name || '')}
+                          disabled={downloading === artifact.name}
+                          size="sm"
+                          title={
+                            artifact.type === 'mind_map'
+                              ? 'Download mindmap'
+                              : artifact.type === 'video_overview'
+                              ? 'Download video'
+                              : artifact.type === 'audio_overview'
+                              ? 'Download audio'
+                              : artifact.type === 'infographic'
+                              ? 'Download infographic'
+                              : artifact.type === 'flashcards'
+                              ? 'Download flashcards'
+                              : artifact.type === 'slide_deck'
+                              ? 'Download slide deck'
+                              : artifact.type === 'reports'
+                              ? 'Download report'
+                              : 'Download artifact'
+                          }
+                        >
+                          {downloading === artifact.name ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => handleDelete(artifact.name || '')}
+                        disabled={deleting === artifact.name}
+                        variant="destructive"
+                        size="sm"
                       >
-                        {downloading === artifact.name ? (
+                        {deleting === artifact.name ? (
                           <>
-                            <div className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                            <span>Downloading...</span>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Deleting...
                           </>
                         ) : (
-                          <span>Download</span>
+                          <>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </>
                         )}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(artifact.name || '')}
-                      disabled={deleting === artifact.name}
-                      className="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
-                    >
-                      {deleting === artifact.name ? 'Deleting...' : 'Delete'}
-                    </button>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {createType && (
         <ArtifactCreateModal

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import TaskStatusPanel from './TaskStatusPanel';
+import { Button } from '@/components/ui/button';
 
 export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -19,26 +20,27 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="border-b bg-background shadow-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between">
           <div className="flex">
             <Link
               href="/notebooks"
-              className="inline-flex items-center border-b-2 border-indigo-500 px-1 pt-1 text-sm font-medium text-gray-900"
+              className="inline-flex items-center border-b-2 border-primary px-1 pt-1 text-sm font-medium text-foreground transition-colors hover:text-primary"
             >
               Notebooks
             </Link>
           </div>
           <div className="flex items-center space-x-4">
             <TaskStatusPanel />
-            <span className="text-sm text-gray-700">Welcome, {user}</span>
-            <button
+            <span className="text-sm text-muted-foreground">Welcome, {user}</span>
+            <Button
               onClick={handleLogout}
-              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+              variant="default"
+              size="sm"
             >
               Logout
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -4,6 +4,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { sourceApi } from '@/lib/api-client';
 import ReactMarkdown from 'react-markdown';
 import { getRTLClasses, getTextDirection } from '@/lib/rtl-utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 interface SourceReviewModalProps {
   notebookId: string;
@@ -63,126 +72,109 @@ export default function SourceReviewModal({
   }, [notebookId, sourceName]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Source Review: {sourceName}</DialogTitle>
+        </DialogHeader>
 
-        <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">
-                Source Review: {sourceName}
-              </h3>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <span className="sr-only">Close</span>
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-                <p className="mt-4 text-gray-600">Loading... This may take a moment.</p>
-              </div>
-            ) : error ? (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-800">{error}</div>
-              </div>
-            ) : data ? (
-              <div 
-                className="space-y-4 max-h-[70vh] overflow-y-auto"
-                dir={contentRTL || 'ltr'}
-              >
-                {data.message && (
-                  <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
-                    {data.message}
-                  </div>
-                )}
-                {data.title && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Title</h4>
-                    <p 
-                      className="text-gray-700"
-                      dir={getTextDirection(data.title)}
-                    >
-                      {data.title}
-                    </p>
-                  </div>
-                )}
-
-                {data.summary && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Summary</h4>
-                    <div 
-                      className="prose max-w-none prose-gray prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900"
-                      dir={getTextDirection(data.summary)}
-                    >
-                      <ReactMarkdown>{data.summary}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {data.key_topics && data.key_topics.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Key Topics</h4>
-                    <ul className={`list-disc space-y-1 ${contentRTL === 'rtl' ? 'list-inside pr-6' : 'list-inside pl-6'}`}>
-                      {data.key_topics.map((topic: string, idx: number) => {
-                        const topicRTL = getTextDirection(topic);
-                        return (
-                          <li 
-                            key={idx} 
-                            className="text-gray-700"
-                            dir={topicRTL}
-                          >
-                            {topic}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
-
-                {data.content && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Content</h4>
-                    <div 
-                      className="prose max-w-none prose-gray prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-ul:text-gray-900 prose-ol:text-gray-900 prose-li:text-gray-900"
-                      dir={getTextDirection(data.content)}
-                    >
-                      <ReactMarkdown>{data.content}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {data.images && data.images.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Images</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      {data.images.map((img: any, idx: number) => (
-                        <div key={idx}>
-                          {img.base64 && (
-                            <img
-                              src={`data:${img.mime_type || 'image/png'};base64,${img.base64}`}
-                              alt={`Image ${idx + 1}`}
-                              className="max-w-full h-auto rounded"
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
+        {loading ? (
+          <div className="text-center py-8">
+            <Loader2 className="inline-block h-8 w-8 animate-spin" />
+            <p className="mt-4 text-muted-foreground">Loading... This may take a moment.</p>
           </div>
-        </div>
-      </div>
-    </div>
+        ) : error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : data ? (
+          <div 
+            className="space-y-4"
+            dir={contentRTL || 'ltr'}
+          >
+            {data.message && (
+              <Alert>
+                <AlertDescription>{data.message}</AlertDescription>
+              </Alert>
+            )}
+            {data.title && (
+              <div>
+                <h4 className="font-semibold text-foreground">Title</h4>
+                <p 
+                  className="text-foreground"
+                  dir={getTextDirection(data.title)}
+                >
+                  {data.title}
+                </p>
+              </div>
+            )}
+
+            {data.summary && (
+              <div>
+                <h4 className="font-semibold text-foreground">Summary</h4>
+                <div 
+                  className="prose max-w-none prose-gray prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
+                  dir={getTextDirection(data.summary)}
+                >
+                  <ReactMarkdown>{data.summary}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {data.key_topics && data.key_topics.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-foreground">Key Topics</h4>
+                <ul className={`list-disc space-y-1 ${contentRTL === 'rtl' ? 'list-inside pr-6' : 'list-inside pl-6'}`}>
+                  {data.key_topics.map((topic: string, idx: number) => {
+                    const topicRTL = getTextDirection(topic);
+                    return (
+                      <li 
+                        key={idx} 
+                        className="text-foreground"
+                        dir={topicRTL}
+                      >
+                        {topic}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {data.content && (
+              <div>
+                <h4 className="font-semibold text-foreground">Content</h4>
+                <div 
+                  className="prose max-w-none prose-gray prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
+                  dir={getTextDirection(data.content)}
+                >
+                  <ReactMarkdown>{data.content}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {data.images && data.images.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-foreground">Images</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {data.images.map((img: any, idx: number) => (
+                    <div key={idx}>
+                      {img.base64 && (
+                        <img
+                          src={`data:${img.mime_type || 'image/png'};base64,${img.base64}`}
+                          alt={`Image ${idx + 1}`}
+                          className="max-w-full h-auto rounded"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 

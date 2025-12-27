@@ -17,6 +17,10 @@ import Navbar from '@/components/Navbar';
 import SourceManager from '@/components/SourceManager';
 import ChatInterface from '@/components/ChatInterface';
 import ArtifactManager from '@/components/ArtifactManager';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 export default function NotebookDetailPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -167,8 +171,8 @@ export default function NotebookDetailPage() {
         <Navbar />
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <Loader2 className="inline-block h-8 w-8 animate-spin" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
           </div>
         </div>
       </>
@@ -178,116 +182,81 @@ export default function NotebookDetailPage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-6">
-            <button
+            <Button
               onClick={() => router.push('/notebooks')}
-              className="mb-4 text-sm text-indigo-600 hover:text-indigo-500"
+              variant="ghost"
+              size="sm"
+              className="mb-4"
             >
-              ← Back to Notebooks
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">Notebook: {notebookId}</h1>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Notebooks
+            </Button>
+            <h1 className="text-3xl font-bold text-foreground">Notebook: {notebookId}</h1>
           </div>
 
           {error && (
-            <div className="mb-4 rounded-md bg-red-50 p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-red-800">{error}</div>
-                <button
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription className="flex items-center justify-between">
+                <span>{error}</span>
+                <Button
                   onClick={() => {
                     setError('');
                     loadTabData(activeTab);
                   }}
-                  className="ml-4 rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500"
+                  variant="outline"
+                  size="sm"
+                  className="ml-4"
                 >
                   Retry
-                </button>
-              </div>
-            </div>
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Tabs */}
-          <div className="mb-6 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => {
-                  setActiveTab('sources');
-                  // Load if not already loaded
-                  if (!loadedTabs.has('sources')) {
-                    loadTabData('sources');
-                  }
-                }}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
-                  activeTab === 'sources'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Sources
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('chat');
-                  // Load if not already loaded
-                  if (!loadedTabs.has('chat')) {
-                    loadTabData('chat');
-                  }
-                }}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
-                  activeTab === 'chat'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Chat
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('artifacts');
-                  // Load if not already loaded
-                  if (!loadedTabs.has('artifacts')) {
-                    loadTabData('artifacts');
-                  }
-                }}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
-                  activeTab === 'artifacts'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Artifacts
-              </button>
-            </nav>
-          </div>
+          <Tabs value={activeTab} onValueChange={(value) => {
+            const tab = value as 'sources' | 'chat' | 'artifacts';
+            setActiveTab(tab);
+            // Load if not already loaded
+            if (!loadedTabs.has(tab)) {
+              loadTabData(tab);
+            }
+          }}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="sources">Sources</TabsTrigger>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+              <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
+            </TabsList>
 
-          {/* Tab Content */}
-          <div>
-            {activeTab === 'sources' && (
+            {/* Tab Content */}
+            <TabsContent value="sources">
               <SourceManager
                 notebookId={notebookId}
                 sources={sources}
                 onSourcesChange={loadSources}
                 loading={loadingSources}
               />
-            )}
-            {activeTab === 'chat' && (
+            </TabsContent>
+            <TabsContent value="chat">
               <ChatInterface
                 notebookId={notebookId}
                 messages={chatMessages}
                 onMessagesChange={loadChatHistory}
                 loading={loadingChat}
               />
-            )}
-            {activeTab === 'artifacts' && (
+            </TabsContent>
+            <TabsContent value="artifacts">
               <ArtifactManager
                 notebookId={notebookId}
                 artifacts={artifacts}
                 onArtifactsChange={loadArtifacts}
                 loading={loadingArtifacts}
               />
-            )}
-          </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </>

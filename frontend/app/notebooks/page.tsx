@@ -7,6 +7,10 @@ import { notebookApi } from '@/lib/api-client';
 import type { Notebook } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, Plus, Trash2, FolderOpen } from 'lucide-react';
 
 export default function NotebooksPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -83,8 +87,8 @@ export default function NotebooksPage() {
         <Navbar />
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <Loader2 className="inline-block h-8 w-8 animate-spin" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
           </div>
         </div>
       </>
@@ -94,63 +98,82 @@ export default function NotebooksPage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-gray-900">My Notebooks</h1>
-            <button
+            <h1 className="text-3xl font-bold text-foreground">My Notebooks</h1>
+            <Button
               onClick={handleCreate}
               disabled={creating}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
             >
-              {creating ? 'Creating...' : 'Create Notebook'}
-            </button>
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Notebook
+                </>
+              )}
+            </Button>
           </div>
 
           {error && (
-            <div className="mb-4 rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-800">{error}</div>
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
           {info && !error && (
-            <div className="mb-4 rounded-md bg-blue-50 p-4">
-              <div className="text-sm text-blue-800">{info}</div>
-            </div>
+            <Alert className="mb-4">
+              <AlertDescription>{info}</AlertDescription>
+            </Alert>
           )}
 
           {notebooks.length === 0 ? (
-            <div className="rounded-lg bg-white p-12 text-center shadow">
-              <p className="text-gray-500">No notebooks yet. Create your first notebook!</p>
-            </div>
+            <Card className="p-12 text-center">
+              <CardContent>
+                <p className="text-muted-foreground">No notebooks yet. Create your first notebook!</p>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {notebooks.map((notebook) => (
-                <div
-                  key={notebook.notebook_id}
-                  className="rounded-lg bg-white p-6 shadow hover:shadow-md transition-shadow"
-                >
-                  <h3 className="mb-2 text-lg font-semibold text-gray-900">
-                    {notebook.notebook_id}
-                  </h3>
-                  <p className="mb-4 text-sm text-gray-500">
-                    Created: {format(new Date(notebook.created_at), 'PPp')}
-                  </p>
-                  <div className="flex space-x-2">
-                    <button
+                <Card key={notebook.notebook_id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{notebook.notebook_id}</CardTitle>
+                    <CardDescription>
+                      Created: {format(new Date(notebook.created_at), 'PPp')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter className="flex space-x-2">
+                    <Button
                       onClick={() => router.push(`/notebooks/${notebook.notebook_id}`)}
-                      className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                      className="flex-1"
                     >
+                      <FolderOpen className="h-4 w-4 mr-2" />
                       Open
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDelete(notebook.notebook_id)}
                       disabled={deletingId === notebook.notebook_id}
-                      className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                      variant="destructive"
                     >
-                      {deletingId === notebook.notebook_id ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                </div>
+                      {deletingId === notebook.notebook_id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
               ))}
             </div>
           )}
