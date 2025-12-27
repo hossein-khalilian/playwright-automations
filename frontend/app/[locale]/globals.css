@@ -1,3 +1,5 @@
+@import url('/fonts/ERPxFonts.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -53,6 +55,12 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Persian font override for RTL pages */
+[dir="rtl"] body {
+  font-family: ERPx, Arial, Helvetica, sans-serif;
+  font-weight: 300;
 }
 
 @layer utilities {

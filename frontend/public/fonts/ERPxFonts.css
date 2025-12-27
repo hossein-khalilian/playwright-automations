@@ -1,0 +1,139 @@
+﻿@font-face {
+	font-family: ERPx;
+	font-style: normal;
+	font-weight: bold;
+	src: url('/fonts/ERPx-B/ERPx-B.eot');
+	src: url('/fonts/ERPx-B/ERPx-B.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/ERPx-B/ERPx-B.woff2') format('woff2'),
+		 url('/fonts/ERPx-B/ERPx-B.woff') format('woff'),
+		 url('/fonts/ERPx-B/ERPx-B.ttf') format('truetype');
+}
+@font-face {
+	font-family:ERPxfaNum;
+	font-style: normal;
+	font-weight: 600;
+	src: url('/fonts/faNum/ERPx-faNum-B.eot');
+	src: url('/fonts/faNum/ERPx-faNum-B.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/faNum/ERPx-faNum-B.woff2') format('woff2'),
+		 url('/fonts/faNum/ERPx-faNum-B.woff') format('woff'),
+		 url('/fonts/faNum/ERPx-faNum-B.ttf') format('truetype');
+}
+@font-face {
+	font-family: ERPx;
+	font-style: normal;
+	font-weight: 500;
+	src: url('/fonts/ERPx-M/ERPx-M.eot');
+	src: url('/fonts/ERPx-M/ERPx-M.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/ERPx-M/ERPx-M.woff2') format('woff2'),
+		 url('/fonts/ERPx-M/ERPx-M.woff') format('woff'),
+		 url('/fonts/ERPx-M/ERPx-M.ttf') format('truetype');
+}
+@font-face {
+	font-family:ERPxfaNum;
+	font-style: normal;
+	font-weight: 500;
+	src: url('/fonts/faNum/ERPx-faNum-M.eot');
+	src: url('/fonts/faNum/ERPx-faNum-M.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/faNum/ERPx-faNum-M.woff2') format('woff2'),
+		 url('/fonts/faNum/ERPx-faNum-M.woff') format('woff'),
+		 url('/fonts/faNum/ERPx-faNum-M.ttf') format('truetype');
+}
+@font-face {
+	font-family: ERPx;
+	font-style: normal;
+	font-weight: 300;
+	src: url('/fonts/ERPx-L/ERPx-L.eot');
+	src: url('/fonts/ERPx-L/ERPx-L.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/ERPx-L/ERPx-L.woff2') format('woff2'),
+		 url('/fonts/ERPx-L/ERPx-L.woff') format('woff'),
+		 url('/fonts/ERPx-L/ERPx-L.ttf') format('truetype');
+}
+@font-face {
+	font-family:ERPxfaNum;
+	font-style: normal;
+	font-weight: 300;
+	src: url('/fonts/faNum/ERPx-faNum-L.eot');
+	src: url('/fonts/faNum/ERPx-faNum-L.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/faNum/ERPx-faNum-L.woff2') format('woff2'),
+		 url('/fonts/faNum/ERPx-faNum-L.woff') format('woff'),
+		 url('/fonts/faNum/ERPx-faNum-L.ttf') format('truetype');
+}
+@font-face {
+	font-family: ERPx;
+	font-style: normal;
+	font-weight: 200;
+	src: url('/fonts/ERPx-UL/ERPx-UL.eot');
+	src: url('/fonts/ERPx-UL/ERPx-UL.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/ERPx-UL/ERPx-UL.woff2') format('woff2'),
+		 url('/fonts/ERPx-UL/ERPx-UL.woff') format('woff'),
+		 url('/fonts/ERPx-UL/ERPx-UL.ttf') format('truetype');
+}
+@font-face {
+	font-family:ERPxfaNum;
+	font-style: normal;
+	font-weight: 200;
+	src: url('/fonts/faNum/ERPx-faNum-UL.eot');
+	src: url('/fonts/faNum/ERPx-faNum-UL.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/faNum/ERPx-faNum-UL.woff2') format('woff2'),
+		 url('/fonts/faNum/ERPx-faNum-UL.woff') format('woff'),
+		 url('/fonts/faNum/ERPx-faNum-UL.ttf') format('truetype');
+}
+@font-face {
+	font-family: ERPx;
+	font-style: normal;
+	font-weight: normal;
+	src: url('/fonts/ERPx/ERPx.eot');
+	src: url('/fonts/ERPx/ERPx.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/ERPx/ERPx.woff2') format('woff2'),
+		 url('/fonts/ERPx/ERPx.woff') format('woff'),
+		 url('/fonts/ERPx/ERPx.ttf') format('truetype');
+}
+@font-face {
+	font-family: ERPxfaNum;
+	font-style: normal;
+	font-weight: normal;
+	src: url('/fonts/faNum/ERPx-faNum.eot');
+	src: url('/fonts/faNum/ERPx-faNum.eot?#iefix') format('embedded-opentype'),
+		 url('/fonts/faNum/ERPx-faNum.woff2') format('woff2'),
+		 url('/fonts/faNum/ERPx-faNum.woff') format('woff'),
+		 url('/fonts/faNum/ERPx-faNum.ttf') format('truetype');
+}
+/* Persian font styles - applied to RTL pages */
+[dir="rtl"] body,
+[dir="rtl"] h1, [dir="rtl"] .h1, 
+[dir="rtl"] h2, [dir="rtl"] .h2, 
+[dir="rtl"] h3, [dir="rtl"] .h3, 
+[dir="rtl"] h4, [dir="rtl"] .h4, 
+[dir="rtl"] h5, [dir="rtl"] .h5, 
+[dir="rtl"] h6, [dir="rtl"] .h6, 
+[dir="rtl"] input, 
+[dir="rtl"] textarea, 
+[dir="rtl"] p, 
+[dir="rtl"] div {
+	font-family: ERPx, Arial, Helvetica, sans-serif;
+}
+
+[dir="rtl"] body {
+	font-weight: 300;
+}
+
+[dir="rtl"] .fa, [dir="rtl"] .gl {
+	font-weight: normal !important;
+	font-style: normal !important;
+}
+
+[dir="rtl"] h1, [dir="rtl"] .h1, 
+[dir="rtl"] h2, [dir="rtl"] .h2, 
+[dir="rtl"] h3, [dir="rtl"] .h3, 
+[dir="rtl"] h4, [dir="rtl"] .h4, 
+[dir="rtl"] h5, [dir="rtl"] .h5, 
+[dir="rtl"] h6, [dir="rtl"] .h6, 
+[dir="rtl"] b, 
+[dir="rtl"] bold, 
+[dir="rtl"] strong {
+	font-weight: 600;
+}
+
+[dir="rtl"] .fa-num {
+	font-family: ERPxfaNum !important;
+}
