@@ -193,19 +193,6 @@ export default function NotebookDetailPage() {
       <Navbar />
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mb-6">
-            <Button
-              onClick={() => router.push('/notebooks')}
-              variant="ghost"
-              size="sm"
-              className="mb-4"
-            >
-              <ArrowLeft className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-              {t('backToNotebooks')}
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground">{t('notebookDetail', { id: notebookId })}</h1>
-          </div>
-
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription className="flex items-center justify-between">
@@ -235,11 +222,21 @@ export default function NotebookDetailPage() {
                 loadTabData(tab);
               }
             }}>
-              <TabsList className="mb-6">
-                <TabsTrigger value="sources">{tSources('title')}</TabsTrigger>
-                <TabsTrigger value="chat">{tChat('title')}</TabsTrigger>
-                <TabsTrigger value="artifacts">{tArtifacts('title')}</TabsTrigger>
-              </TabsList>
+              <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between mb-6`}>
+                <TabsList>
+                  <TabsTrigger value="sources">{tSources('title')}</TabsTrigger>
+                  <TabsTrigger value="chat">{tChat('title')}</TabsTrigger>
+                  <TabsTrigger value="artifacts">{tArtifacts('title')}</TabsTrigger>
+                </TabsList>
+                <Button
+                  onClick={() => router.push('/notebooks')}
+                  variant="ghost"
+                  size="sm"
+                >
+                  <ArrowLeft className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                  {t('backToNotebooks')}
+                </Button>
+              </div>
 
             {/* Tab Content */}
             <TabsContent value="sources">
