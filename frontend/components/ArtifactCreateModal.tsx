@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { artifactApi } from '@/lib/api-client';
 import type {
   AudioOverviewCreateRequest,
@@ -42,34 +43,40 @@ export default function ArtifactCreateModal({
   artifactType,
   onClose,
 }: ArtifactCreateModalProps) {
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
+  const t = useTranslations('artifacts');
+  const tCommon = useTranslations('common');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // Form state based on artifact type
-  // Audio defaults: Deep Dive, English, Default length
+  // Default language based on platform locale
+  const defaultLanguage = isRTL ? 'persian' : 'english';
+  // Audio defaults: Deep Dive, Default language, Default length
   const [audioFormat, setAudioFormat] = useState<string>('Deep Dive');
-  const [audioLanguage, setAudioLanguage] = useState<string>('english');
+  const [audioLanguage, setAudioLanguage] = useState<string>(defaultLanguage);
   const [audioLength, setAudioLength] = useState<string>('Default');
-  // Video defaults: Explainer, English, Auto-select
+  // Video defaults: Explainer, Default language, Auto-select
   const [videoFormat, setVideoFormat] = useState<string>('Explainer');
-  const [videoLanguage, setVideoLanguage] = useState<string>('english');
+  const [videoLanguage, setVideoLanguage] = useState<string>(defaultLanguage);
   const [visualStyle, setVisualStyle] = useState<string>('Auto-select');
   const [customStyleDescription, setCustomStyleDescription] = useState('');
-  // Slide deck defaults: Detailed Deck, English, Default length
+  // Slide deck defaults: Detailed Deck, Default language, Default length
   const [slideDeckFormat, setSlideDeckFormat] = useState<string>('Detailed Deck');
-  const [slideDeckLanguage, setSlideDeckLanguage] = useState<string>('english');
+  const [slideDeckLanguage, setSlideDeckLanguage] = useState<string>(defaultLanguage);
   const [slideDeckLength, setSlideDeckLength] = useState<string>('Default');
   // Defaults: Standard for count, Medium for difficulty
   const [cardCount, setCardCount] = useState<string>('Standard');
   const [questionCount, setQuestionCount] = useState<string>('Standard');
   const [difficulty, setDifficulty] = useState<string>('Medium');
-  // Defaults: English, Landscape, Standard
-  const [infographicLanguage, setInfographicLanguage] = useState<string>('english');
+  // Defaults: Default language, Landscape, Standard
+  const [infographicLanguage, setInfographicLanguage] = useState<string>(defaultLanguage);
   const [orientation, setOrientation] = useState<string>('Landscape');
   const [detailLevel, setDetailLevel] = useState<string>('Standard');
-  // Report defaults: Create Your Own, English
+  // Report defaults: Create Your Own, Default language
   const [reportFormat, setReportFormat] = useState<ReportFormat>('Create Your Own');
-  const [reportLanguage, setReportLanguage] = useState<AudioLanguage>('english');
+  const [reportLanguage, setReportLanguage] = useState<AudioLanguage>(defaultLanguage as AudioLanguage);
   const [focusText, setFocusText] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
@@ -152,7 +159,7 @@ export default function ArtifactCreateModal({
         case 'report': {
           // For "Create Your Own", description is mandatory
           if (reportFormat === 'Create Your Own' && !description.trim()) {
-            setError('Description is required for "Create Your Own" format');
+            setError(t('reportDescriptionRequired'));
             setLoading(false);
             return;
           }
@@ -216,17 +223,17 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('audioFormat')}</label>
               <div className="space-y-3">
                 {[
-                  { value: 'Deep Dive', label: 'Deep Dive', description: 'A lively conversation between two hosts, unpacking and connecting topics in your sources' },
-                  { value: 'Brief', label: 'Brief', description: 'A bite-sized overview to help you grasp the core ideas from your sources quickly' },
-                  { value: 'Critique', label: 'Critique', description: 'An expert review of your sources, offering constructive feedback to help you improve your material' },
-                  { value: 'Debate', label: 'Debate', description: 'A thoughtful debate between two hosts, illuminating different perspectives on your sources' },
+                  { value: 'Deep Dive', label: t('audioFormatDeepDive'), description: t('audioFormatDeepDiveDesc') },
+                  { value: 'Brief', label: t('audioFormatBrief'), description: t('audioFormatBriefDesc') },
+                  { value: 'Critique', label: t('audioFormatCritique'), description: t('audioFormatCritiqueDesc') },
+                  { value: 'Debate', label: t('audioFormatDebate'), description: t('audioFormatDebateDesc') },
                 ].map((format) => (
                   <label
                     key={format.value}
-                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    className={`flex items-start ${isRTL ? 'flex-row-reverse' : ''} p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                       audioFormat === format.value
                         ? 'border-indigo-600 bg-indigo-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -238,7 +245,7 @@ export default function ArtifactCreateModal({
                       value={format.value}
                       checked={audioFormat === format.value}
                       onChange={(e) => setAudioFormat(e.target.value)}
-                      className="mt-1 mr-3"
+                      className={`mt-1 ${isRTL ? 'ml-3' : 'mr-3'}`}
                     />
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">{format.label}</div>
@@ -250,7 +257,7 @@ export default function ArtifactCreateModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Choose language</Label>
+                <Label>{t('chooseLanguage')}</Label>
                 <Select
                   value={audioLanguage}
                   onValueChange={setAudioLanguage}
@@ -259,14 +266,14 @@ export default function ArtifactCreateModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="english">English</SelectItem>
-                    <SelectItem value="persian">Persian</SelectItem>
+                    <SelectItem value="english">{t('languageEnglish')}</SelectItem>
+                    <SelectItem value="persian">{t('languagePersian')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {audioFormat === 'Deep Dive' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('audioLength')}</label>
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -274,7 +281,7 @@ export default function ArtifactCreateModal({
                       variant={audioLength === 'Short' ? 'default' : 'outline'}
                       className="flex-1"
                     >
-                      Short
+                      {t('audioLengthShort')}
                     </Button>
                     <Button
                       type="button"
@@ -282,7 +289,7 @@ export default function ArtifactCreateModal({
                       variant={audioLength === 'Default' ? 'default' : 'outline'}
                       className="flex-1"
                     >
-                      Default
+                      {t('audioLengthDefault')}
                     </Button>
                     <Button
                       type="button"
@@ -290,14 +297,14 @@ export default function ArtifactCreateModal({
                       variant={audioLength === 'Long' ? 'default' : 'outline'}
                       className="flex-1"
                     >
-                      Long
+                      {t('audioLengthLong')}
                     </Button>
                   </div>
                 </div>
               )}
               {(audioFormat === 'Critique' || audioFormat === 'Debate') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('audioLength')}</label>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -308,7 +315,7 @@ export default function ArtifactCreateModal({
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      Short
+                      {t('audioLengthShort')}
                     </button>
                     <button
                       type="button"
@@ -319,7 +326,7 @@ export default function ArtifactCreateModal({
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      Default
+                      {t('audioLengthDefault')}
                     </button>
                   </div>
                 </div>
@@ -327,17 +334,13 @@ export default function ArtifactCreateModal({
               {audioFormat === 'Brief' && <div></div>}
             </div>
             <div>
-              <Label>What should the AI hosts focus on in this episode?</Label>
+              <Label>{t('audioFocusLabel')}</Label>
               <Textarea
                 value={focusText}
                 onChange={(e) => setFocusText(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder={`Things to try
-
- • Focus on a specific source ("only cover the article about Italy")
- • Focus on a specific topic ("just discuss the novel's main character")
- • Target a specific audience ("explain to someone new to biology")`}
+                placeholder={t('audioFocusPlaceholder')}
               />
             </div>
           </>
@@ -347,15 +350,15 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('videoFormat')}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: 'Explainer', label: 'Explainer', description: 'A structured, comprehensive overview that connects the dots within your sources' },
-                  { value: 'Brief', label: 'Brief', description: 'A bite-sized overview to help you quickly grasp core ideas from your sources' },
+                  { value: 'Explainer', label: t('videoFormatExplainer'), description: t('videoFormatExplainerDesc') },
+                  { value: 'Brief', label: t('videoFormatBrief'), description: t('videoFormatBriefDesc') },
                 ].map((format) => (
                   <label
                     key={format.value}
-                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    className={`flex items-start ${isRTL ? 'flex-row-reverse' : ''} p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                       videoFormat === format.value
                         ? 'border-indigo-600 bg-indigo-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -367,7 +370,7 @@ export default function ArtifactCreateModal({
                       value={format.value}
                       checked={videoFormat === format.value}
                       onChange={(e) => setVideoFormat(e.target.value)}
-                      className="mt-1 mr-3"
+                      className={`mt-1 ${isRTL ? 'ml-3' : 'mr-3'}`}
                     />
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">{format.label}</div>
@@ -378,37 +381,48 @@ export default function ArtifactCreateModal({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseLanguage')}</label>
               <select
                 value={videoLanguage}
                 onChange={(e) => setVideoLanguage(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               >
-                <option value="english">English</option>
-                <option value="persian">Persian</option>
+                <option value="english">{t('languageEnglish')}</option>
+                <option value="persian">{t('languagePersian')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Choose visual style</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseVisualStyle')}</label>
               <div className="grid grid-cols-3 gap-2">
-                {['Auto-select', 'Custom', 'Classic', 'Whiteboard', 'Kawaii', 'Anime', 'Watercolor', 'Retro print', 'Heritage', 'Paper-craft'].map((style) => (
+                {[
+                  { value: 'Auto-select', label: t('visualStyleAutoSelect') },
+                  { value: 'Custom', label: t('visualStyleCustom') },
+                  { value: 'Classic', label: t('visualStyleClassic') },
+                  { value: 'Whiteboard', label: t('visualStyleWhiteboard') },
+                  { value: 'Kawaii', label: t('visualStyleKawaii') },
+                  { value: 'Anime', label: t('visualStyleAnime') },
+                  { value: 'Watercolor', label: t('visualStyleWatercolor') },
+                  { value: 'Retro print', label: t('visualStyleRetroPrint') },
+                  { value: 'Heritage', label: t('visualStyleHeritage') },
+                  { value: 'Paper-craft', label: t('visualStylePaperCraft') },
+                ].map((style) => (
                   <label
-                    key={style}
-                    className={`flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
-                      visualStyle === style
+                    key={style.value}
+                    className={`flex items-center ${isRTL ? 'flex-row-reverse justify-center' : 'justify-center'} gap-2 p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      visualStyle === style.value
                         ? 'border-indigo-600 bg-indigo-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
-                  >
+                    >
                     <input
                       type="radio"
                       name="visualStyle"
-                      value={style}
-                      checked={visualStyle === style}
+                      value={style.value}
+                      checked={visualStyle === style.value}
                       onChange={(e) => setVisualStyle(e.target.value)}
-                      className="mr-2"
+                      className="shrink-0"
                     />
-                    <span className="text-sm font-medium text-gray-700">{style}</span>
+                    <span className="text-sm font-medium text-gray-700">{style.label}</span>
                   </label>
                 ))}
               </div>
@@ -416,12 +430,12 @@ export default function ArtifactCreateModal({
             {visualStyle === 'Custom' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Style Description (required)
+                  {t('customStyleDescription')}
                 </label>
                 <textarea
                   value={customStyleDescription}
                   onChange={(e) => setCustomStyleDescription(e.target.value)}
-                  rows={3}
+                  rows={5}
                   maxLength={5000}
                   required
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
@@ -429,17 +443,13 @@ export default function ArtifactCreateModal({
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What should the AI hosts focus on?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('videoFocusLabel')}</label>
               <textarea
                 value={focusText}
                 onChange={(e) => setFocusText(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder={`Things to try
-
- • Target a specific use case ("present this to a book club", "help me review for a quiz")
- • Focus on a specific source ("show the photos from the album", "focus on the biology paper")
- • Describe the show structure ("start by talking about the mission", "end with next steps")`}
+                placeholder={t('videoFocusPlaceholder')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -451,7 +461,7 @@ export default function ArtifactCreateModal({
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Cards</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('numberOfCards')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -462,7 +472,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Fewer
+                    {t('cardCountFewer')}
                   </button>
                   <button
                     type="button"
@@ -473,7 +483,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Standard (Default)
+                    {t('cardCountStandard')}
                   </button>
                   <button
                     type="button"
@@ -484,12 +494,12 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    More
+                    {t('cardCountMore')}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Level of Difficulty</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('levelOfDifficulty')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -500,7 +510,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Easy
+                    {t('difficultyEasy')}
                   </button>
                   <button
                     type="button"
@@ -511,7 +521,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Medium (Default)
+                    {t('difficultyMedium')}
                   </button>
                   <button
                     type="button"
@@ -522,23 +532,19 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Hard
+                    {t('difficultyHard')}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What should the topic be?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('flashcardTopicLabel')}</label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder={`Things to try
-
- • The flashcards must be restricted to a specific source (e.g. "the article about Italy")
- • The flashcards must focus on a specific topic like "Newton's second law"
- • The card fronts must be short (1-5 words) for memorization`}
+                placeholder={t('flashcardTopicPlaceholder')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -550,7 +556,7 @@ export default function ArtifactCreateModal({
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Questions</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('numberOfQuestions')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -561,7 +567,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Fewer
+                    {t('questionCountFewer')}
                   </button>
                   <button
                     type="button"
@@ -572,7 +578,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Standard (Default)
+                    {t('questionCountStandard')}
                   </button>
                   <button
                     type="button"
@@ -583,12 +589,12 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    More
+                    {t('questionCountMore')}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Level of Difficulty</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('levelOfDifficulty')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -599,7 +605,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Easy
+                    {t('difficultyEasy')}
                   </button>
                   <button
                     type="button"
@@ -610,7 +616,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Medium (Default)
+                    {t('difficultyMedium')}
                   </button>
                   <button
                     type="button"
@@ -621,23 +627,19 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Hard
+                    {t('difficultyHard')}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What should the topic be?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('quizTopicLabel')}</label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder={`Things to try
-
- • The quiz must be restricted to a specific source (e.g. "the article about Italy")
- • The quiz must focus solely on the key concepts of physics
- • Create a quiz to help me prepare for my history exam on Ancient Egypt`}
+                placeholder={t('quizTopicPlaceholder')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -649,18 +651,18 @@ export default function ArtifactCreateModal({
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseLanguage')}</label>
                 <select
                   value={infographicLanguage}
                   onChange={(e) => setInfographicLanguage(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
-                  <option value="english">English</option>
-                  <option value="persian">Persian</option>
+                  <option value="english">{t('languageEnglish')}</option>
+                  <option value="persian">{t('languagePersian')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose orientation</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseOrientation')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -671,7 +673,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Landscape
+                    {t('orientationLandscape')}
                   </button>
                   <button
                     type="button"
@@ -682,7 +684,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Portrait
+                    {t('orientationPortrait')}
                   </button>
                   <button
                     type="button"
@@ -693,13 +695,13 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Square
+                    {t('orientationSquare')}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Level of detail</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('levelOfDetail')}</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -710,7 +712,7 @@ export default function ArtifactCreateModal({
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  Concise
+                  {t('detailLevelConcise')}
                 </button>
                 <button
                   type="button"
@@ -721,7 +723,7 @@ export default function ArtifactCreateModal({
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  Standard
+                  {t('detailLevelStandard')}
                 </button>
                 <button
                   type="button"
@@ -732,18 +734,18 @@ export default function ArtifactCreateModal({
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  Detailed <span className="text-xs">BETA</span>
+                  {t('detailLevelDetailedBeta')}
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Describe the infographic you want to create</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('infographicDescriptionLabel')}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder='Guide the style, color, or focus: "Use a blue color theme and highlight the 3 key stats."'
+                placeholder={t('infographicDescriptionPlaceholder')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -754,15 +756,15 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('slideDeckFormat')}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: 'Detailed Deck', label: 'Detailed Deck', description: 'A comprehensive deck with full text and details, perfect for emailing or reading on its own.' },
-                  { value: 'Presenter Slides', label: 'Presenter Slides', description: 'Clean, visual slides with key talking points to support you while you speak.' },
+                  { value: 'Detailed Deck', label: t('slideDeckFormatDetailedDeck'), description: t('slideDeckFormatDetailedDeckDesc') },
+                  { value: 'Presenter Slides', label: t('slideDeckFormatPresenterSlides'), description: t('slideDeckFormatPresenterSlidesDesc') },
                 ].map((format) => (
                   <label
                     key={format.value}
-                    className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    className={`flex items-start ${isRTL ? 'flex-row-reverse' : ''} p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                       slideDeckFormat === format.value
                         ? 'border-indigo-600 bg-indigo-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -774,7 +776,7 @@ export default function ArtifactCreateModal({
                       value={format.value}
                       checked={slideDeckFormat === format.value}
                       onChange={(e) => setSlideDeckFormat(e.target.value)}
-                      className="mt-1 mr-3"
+                      className={`mt-1 ${isRTL ? 'ml-3' : 'mr-3'}`}
                     />
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">{format.label}</div>
@@ -786,18 +788,18 @@ export default function ArtifactCreateModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseLanguage')}</label>
                 <select
                   value={slideDeckLanguage}
                   onChange={(e) => setSlideDeckLanguage(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
-                  <option value="english">English</option>
-                  <option value="persian">Persian</option>
+                  <option value="english">{t('languageEnglish')}</option>
+                  <option value="persian">{t('languagePersian')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('slideDeckLength')}</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -808,7 +810,7 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Short
+                    {t('slideDeckLengthShort')}
                   </button>
                   <button
                     type="button"
@@ -819,19 +821,19 @@ export default function ArtifactCreateModal({
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Default
+                    {t('slideDeckLengthDefault')}
                   </button>
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Describe the slide deck you want to create</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('slideDeckDescriptionLabel')}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={3}
+                rows={5}
                 maxLength={5000}
-                placeholder={`Add a high-level outline, or guide the audience, style, and focus: "Create a deck for beginners using a bold and playful style with a focus on step-by-step instructions."`}
+                placeholder={t('slideDeckDescriptionPlaceholder')}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
             </div>
@@ -842,17 +844,17 @@ export default function ArtifactCreateModal({
         return (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('reportFormat')}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: 'Create Your Own', title: 'Create Your Own', description: 'Craft reports your way by specifying structure, style, tone, and more' },
-                  { value: 'Briefing Doc', title: 'Briefing Doc', description: 'Overview of your sources featuring key insights and quotes' },
-                  { value: 'Study Guide', title: 'Study Guide', description: 'Short-answer quiz, suggested essay questions, and glossary of key terms' },
-                  { value: 'Blog Post', title: 'Blog Post', description: 'Insightful takeaways distilled into a highly readable article' },
-                  { value: 'Design Document', title: 'Design Document', description: 'A technical document comparing data models for a new data-intensive application.' },
-                  { value: 'Strategy Memo', title: 'Strategy Memo', description: 'A memo outlining a strategy for evolving a system to a distributed architecture.' },
-                  { value: 'Concept Explainer', title: 'Concept Explainer', description: 'Learn the essential principles for building strong and lasting data applications.' },
-                  { value: 'Comparative Overview', title: 'Comparative Overview', description: 'Discover the main differences between how databases store and organize information.' },
+                  { value: 'Create Your Own', title: t('reportFormatCreateYourOwn'), description: t('reportFormatCreateYourOwnDesc') },
+                  { value: 'Briefing Doc', title: t('reportFormatBriefingDoc'), description: t('reportFormatBriefingDocDesc') },
+                  { value: 'Study Guide', title: t('reportFormatStudyGuide'), description: t('reportFormatStudyGuideDesc') },
+                  { value: 'Blog Post', title: t('reportFormatBlogPost'), description: t('reportFormatBlogPostDesc') },
+                  { value: 'Design Document', title: t('reportFormatDesignDocument'), description: t('reportFormatDesignDocumentDesc') },
+                  { value: 'Strategy Memo', title: t('reportFormatStrategyMemo'), description: t('reportFormatStrategyMemoDesc') },
+                  { value: 'Concept Explainer', title: t('reportFormatConceptExplainer'), description: t('reportFormatConceptExplainerDesc') },
+                  { value: 'Comparative Overview', title: t('reportFormatComparativeOverview'), description: t('reportFormatComparativeOverviewDesc') },
                 ].map((format) => (
                   <label
                     key={format.value}
@@ -882,7 +884,7 @@ export default function ArtifactCreateModal({
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-gray-900">{format.title}</div>
                       {reportFormat === format.value && (
-                        <span className="text-xs text-indigo-700 font-semibold">Selected</span>
+                        <span className="text-xs text-indigo-700 font-semibold">{t('selected')}</span>
                       )}
                     </div>
                     <div className="text-sm text-gray-600 mt-2">{format.description}</div>
@@ -892,37 +894,37 @@ export default function ArtifactCreateModal({
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Choose language</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('chooseLanguage')}</label>
                 <select
                   value={reportLanguage}
                   onChange={(e) => setReportLanguage(e.target.value as AudioLanguage)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
                 >
-                  <option value="english">English (default)</option>
-                  <option value="persian">Persian</option>
+                  <option value="english">{t('languageEnglish')}</option>
+                  <option value="persian">{t('languagePersian')}</option>
                 </select>
               </div>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Describe the report you want to create
+                {t('reportDescriptionLabel')}
                 {reportFormat === 'Create Your Own' && <span className="text-red-500 ml-1">*</span>}
               </label>
               {reportFormat !== 'Create Your Own' && reportFormatDefaults[reportFormat] && (
                 <p className="text-xs text-gray-500 mb-2">
-                  Default description is pre-filled. You can edit it if needed.
+                  {t('reportDescriptionHelper')}
                 </p>
               )}
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={reportFormat === 'Create Your Own' ? 4 : 6}
+                rows={reportFormat === 'Create Your Own' ? 6 : 8}
                 maxLength={5000}
                 required={reportFormat === 'Create Your Own'}
                 placeholder={
                   reportFormat === 'Create Your Own'
-                    ? 'For example:\n\nCreate a formal competitive review of the 2026 functional beverage market for a new wellness drink. The tone should be analytical and strategic, focusing on the distribution and pricing of key competitors to inform our launch strategy.'
-                    : 'Edit the default description or use as-is.'
+                    ? t('reportDescriptionPlaceholderCreateYourOwn')
+                    : t('reportDescriptionPlaceholderDefault')
                 }
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 bg-white"
               />
@@ -933,7 +935,7 @@ export default function ArtifactCreateModal({
       case 'mindmap':
         return (
           <div className="text-sm text-gray-600">
-            Click &quot;Create&quot; to generate a mind map for this notebook. No additional configuration is required.
+            {t('mindMapDescription')}
           </div>
         );
 
@@ -944,14 +946,14 @@ export default function ArtifactCreateModal({
 
   const getTitle = () => {
     const titles: Record<string, string> = {
-      'audio-overview': 'Create Audio Overview',
-      'video-overview': 'Create Video Overview',
-      flashcards: 'Create Flashcards',
-      quiz: 'Create Quiz',
-      infographic: 'Create Infographic',
-      'slide-deck': 'Create Slide Deck',
-      report: 'Create Report',
-      mindmap: 'Create Mind Map',
+      'audio-overview': t('createAudioOverview'),
+      'video-overview': t('createVideoOverview'),
+      flashcards: t('createFlashcards'),
+      quiz: t('createQuiz'),
+      infographic: t('createInfographic'),
+      'slide-deck': t('createSlideDeck'),
+      report: t('createReport'),
+      mindmap: t('createMindMap'),
     };
     return titles[artifactType] || 'Create Artifact';
   };
@@ -978,7 +980,7 @@ export default function ArtifactCreateModal({
               onClick={onClose}
               variant="outline"
             >
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button
               type="submit"
@@ -987,10 +989,10 @@ export default function ArtifactCreateModal({
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
+                  {t('creating')}
                 </>
               ) : (
-                'Create'
+                tCommon('create')
               )}
             </Button>
           </DialogFooter>
