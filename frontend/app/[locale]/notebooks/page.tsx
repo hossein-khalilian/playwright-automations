@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { notebookApi } from '@/lib/api-client';
 import type { Notebook } from '@/lib/types';
 import Navbar from '@/components/Navbar';
@@ -16,6 +16,8 @@ import { Loader2, Plus, Trash2, FolderOpen } from 'lucide-react';
 export default function NotebooksPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('notebooks');
   const tCommon = useTranslations('common');
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -111,12 +113,12 @@ export default function NotebooksPage() {
             >
               {creating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
                   {t('creating')}
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                   {t('createNotebook')}
                 </>
               )}
@@ -150,12 +152,12 @@ export default function NotebooksPage() {
                       {t('created')}: {format(new Date(notebook.created_at), 'PPp')}
                     </CardDescription>
                   </CardHeader>
-                  <CardFooter className="flex space-x-2">
+                  <CardFooter className={`flex ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
                     <Button
                       onClick={() => router.push(`/notebooks/${notebook.notebook_id}`)}
                       className="flex-1"
                     >
-                      <FolderOpen className="h-4 w-4 mr-2" />
+                      <FolderOpen className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       {tCommon('open')}
                     </Button>
                     <Button

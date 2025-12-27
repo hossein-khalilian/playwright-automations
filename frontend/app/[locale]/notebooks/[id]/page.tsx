@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from '@/lib/navigation';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import {
   sourceApi,
   chatApi,
@@ -29,6 +29,8 @@ export default function NotebookDetailPage() {
   const router = useRouter();
   const params = useParams();
   const notebookId = params.id as string;
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('notebooks');
   const tCommon = useTranslations('common');
   const tSources = useTranslations('sources');
@@ -198,7 +200,7 @@ export default function NotebookDetailPage() {
               size="sm"
               className="mb-4"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
               {t('backToNotebooks')}
             </Button>
             <h1 className="text-3xl font-bold text-foreground">{t('notebookDetail', { id: notebookId })}</h1>
@@ -215,7 +217,7 @@ export default function NotebookDetailPage() {
                   }}
                   variant="outline"
                   size="sm"
-                  className="ml-4"
+                  className={isRTL ? 'mr-4' : 'ml-4'}
                 >
                   {tCommon('retry')}
                 </Button>
@@ -224,19 +226,20 @@ export default function NotebookDetailPage() {
           )}
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(value) => {
-            const tab = value as 'sources' | 'chat' | 'artifacts';
-            setActiveTab(tab);
-            // Load if not already loaded
-            if (!loadedTabs.has(tab)) {
-              loadTabData(tab);
-            }
-          }}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="sources">{tSources('title')}</TabsTrigger>
-              <TabsTrigger value="chat">{tChat('title')}</TabsTrigger>
-              <TabsTrigger value="artifacts">{tArtifacts('title')}</TabsTrigger>
-            </TabsList>
+          <div dir={isRTL ? 'rtl' : 'ltr'}>
+            <Tabs value={activeTab} onValueChange={(value) => {
+              const tab = value as 'sources' | 'chat' | 'artifacts';
+              setActiveTab(tab);
+              // Load if not already loaded
+              if (!loadedTabs.has(tab)) {
+                loadTabData(tab);
+              }
+            }}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="sources">{tSources('title')}</TabsTrigger>
+                <TabsTrigger value="chat">{tChat('title')}</TabsTrigger>
+                <TabsTrigger value="artifacts">{tArtifacts('title')}</TabsTrigger>
+              </TabsList>
 
             {/* Tab Content */}
             <TabsContent value="sources">
@@ -263,7 +266,8 @@ export default function NotebookDetailPage() {
                 loading={loadingArtifacts}
               />
             </TabsContent>
-          </Tabs>
+            </Tabs>
+          </div>
         </div>
       </div>
     </>

@@ -72,6 +72,10 @@
     "uploading": "Uploading...",
     "selectFile": "Select file",
     "dragDrop": "or drag and drop",
+    "clickToUpload": "Click to upload",
+    "orDragDrop": "or drag and drop",
+    "dropFile": "Drop file here",
+    "supportedFormats": "Documents, images, audio, video and other supported file types",
     "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
     "deleteSubmitted": "Delete submitted.",
     "loadFailed": "Failed to load sources",
@@ -99,7 +103,10 @@
     "addUrlsFailed": "Failed to add URL sources",
     "urlsRequired": "Please enter at least one URL",
     "newName": "New name",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "statusReady": "Ready",
+    "statusProcessing": "Processing",
+    "statusUnknown": "Unknown"
   },
   "chat": {
     "title": "Chat",

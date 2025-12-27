@@ -192,6 +192,16 @@ body {
   border-left-width: 0;
 }
 
+/* RTL support for tabs */
+[dir="rtl"] [role="tablist"] {
+  direction: rtl;
+}
+
+[dir="rtl"] [role="tab"] {
+  direction: rtl;
+  text-align: right;
+}
+
 /* Ensure input text is visible */
 input[type="text"],
 input[type="email"],

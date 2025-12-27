@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useState, useRef } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { sourceApi } from '@/lib/api-client';
 import type { Source } from '@/lib/types';
 import SourceReviewModal from './SourceReviewModal';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, Trash2, FileEdit, Eye } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, FileEdit, Eye, Upload, X } from 'lucide-react';
 
 interface SourceManagerProps {
   notebookId: string;
@@ -26,6 +26,8 @@ export default function SourceManager({
   onSourcesChange,
   loading = false,
 }: SourceManagerProps) {
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('sources');
   const tCommon = useTranslations('common');
   const [uploading, setUploading] = useState(false);
@@ -39,15 +41,53 @@ export default function SourceManager({
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = (file: File) => {
     if (file) {
       setSelectedFile(file);
       setError('');
       setInfo('');
     }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
     e.target.value = ''; // Reset input to allow selecting the same file again
+  };
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (uploading) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
   };
 
   const handleFileUpload = async () => {
@@ -165,42 +205,103 @@ export default function SourceManager({
           <CardTitle>{t('uploadSource')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Input
-              type="file"
-              onChange={handleFileSelect}
-              disabled={uploading}
-            />
-          </div>
-          {selectedFile && (
-            <div className="flex items-center justify-between rounded-md border bg-muted p-3">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileInputChange}
+            disabled={uploading}
+            className="hidden"
+          />
+          
+          {!selectedFile ? (
+            <div
+              ref={dropZoneRef}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={handleBrowseClick}
+              className={`
+                relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12
+                transition-colors cursor-pointer
+                ${isDragging 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
+                }
+                ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
+            >
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className={`
+                  rounded-full p-4
+                  ${isDragging ? 'bg-primary/10' : 'bg-muted'}
+                `}>
+                  <Upload className={`h-8 w-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {isDragging ? (
+                      <span className="text-primary">{t('dropFile')}</span>
+                    ) : (
+                      <>
+                        <span className="text-primary">{t('clickToUpload')}</span>
+                        {' '}
+                        {t('orDragDrop')}
+                      </>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('supportedFormats')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={`
+              flex items-center gap-4 rounded-lg border bg-muted/50 p-4
+              ${isRTL ? 'flex-row-reverse' : ''}
+            `}>
+              <div className="flex-shrink-0 rounded bg-background p-2">
+                <Upload className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : ''}`}>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {selectedFile.name}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {(selectedFile.size / 1024).toFixed(2)} KB
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <Button
-                  onClick={() => setSelectedFile(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFile(null);
+                  }}
                   disabled={uploading}
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
                 >
-                  {tCommon('cancel')}
+                  <X className="h-4 w-4" />
                 </Button>
                 <Button
-                  onClick={handleFileUpload}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFileUpload();
+                  }}
                   disabled={uploading}
                   size="sm"
                 >
                   {uploading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
                       {t('uploading')}
                     </>
                   ) : (
-                    tCommon('upload')
+                    <>
+                      <Upload className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {tCommon('upload')}
+                    </>
                   )}
                 </Button>
               </div>
@@ -221,6 +322,8 @@ export default function SourceManager({
             placeholder={t('urlsPlaceholder')}
             disabled={addingUrls}
             rows={6}
+            dir={isRTL ? 'rtl' : 'ltr'}
+            className={isRTL ? 'text-right' : ''}
           />
           <div className="flex items-center justify-end">
             <Button
@@ -229,7 +332,7 @@ export default function SourceManager({
             >
               {addingUrls ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
                   {t('adding')}
                 </>
               ) : (
@@ -246,11 +349,11 @@ export default function SourceManager({
       {/* Sources List */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
             <CardTitle>{t('title')}</CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
               {loading && (
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'} text-sm text-muted-foreground`}>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>{tCommon('loading')}</span>
                 </div>
@@ -262,7 +365,7 @@ export default function SourceManager({
                 size="sm"
                 title={t('reloadTitle')}
               >
-                <RefreshCw className="h-4 w-4 mr-1" />
+                <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
                 {t('reload')}
               </Button>
             </div>
@@ -282,21 +385,48 @@ export default function SourceManager({
             <ul className="divide-y divide-border">
               {sources.map((source) => (
                 <li key={source.name} className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-sm font-medium text-foreground">{source.name}</h3>
-                        <Badge
-                          variant={
-                            source.status === 'ready'
-                              ? 'default'
-                              : source.status === 'processing'
-                              ? 'secondary'
-                              : 'outline'
-                          }
-                        >
-                          {source.status}
-                        </Badge>
+                  <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
+                    <div className={`flex-1 ${isRTL ? 'text-right' : ''}`}>
+                      <div className={`flex items-center ${isRTL ? 'space-x-3 justify-end' : 'space-x-3'}`}>
+                        {isRTL ? (
+                          <>
+                            <Badge
+                              variant={
+                                source.status === 'ready'
+                                  ? 'default'
+                                  : source.status === 'processing'
+                                  ? 'secondary'
+                                  : 'outline'
+                              }
+                            >
+                              {source.status === 'ready'
+                                ? t('statusReady')
+                                : source.status === 'processing'
+                                ? t('statusProcessing')
+                                : t('statusUnknown')}
+                            </Badge>
+                            <h3 className="text-sm font-medium text-foreground">{source.name}</h3>
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="text-sm font-medium text-foreground">{source.name}</h3>
+                            <Badge
+                              variant={
+                                source.status === 'ready'
+                                  ? 'default'
+                                  : source.status === 'processing'
+                                  ? 'secondary'
+                                  : 'outline'
+                              }
+                            >
+                              {source.status === 'ready'
+                                ? t('statusReady')
+                                : source.status === 'processing'
+                                ? t('statusProcessing')
+                                : t('statusUnknown')}
+                            </Badge>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -326,7 +456,7 @@ export default function SourceManager({
                           >
                             {renamingSubmitting === source.name ? (
                               <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                <Loader2 className={`h-3 w-3 ${isRTL ? 'ml-1' : 'mr-1'} animate-spin`} />
                                 {t('saving')}
                               </>
                             ) : (
@@ -347,37 +477,75 @@ export default function SourceManager({
                         </div>
                       ) : (
                         <>
-                          <Button
-                            onClick={() => setSelectedSource(source.name)}
-                            size="sm"
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            {t('review')}
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setRenaming(source.name);
-                              setNewName(source.name);
-                            }}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <FileEdit className="h-4 w-4 mr-1" />
-                            {t('rename')}
-                          </Button>
-                          <Button
-                            onClick={() => handleDelete(source.name)}
-                            disabled={deleting === source.name}
-                            variant="destructive"
-                            size="icon"
-                            title={tCommon('delete')}
-                          >
-                            {deleting === source.name ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
+                          {isRTL ? (
+                            <>
+                              <Button
+                                onClick={() => handleDelete(source.name)}
+                                disabled={deleting === source.name}
+                                variant="destructive"
+                                size="icon"
+                                title={tCommon('delete')}
+                              >
+                                {deleting === source.name ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setRenaming(source.name);
+                                  setNewName(source.name);
+                                }}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <FileEdit className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                {t('rename')}
+                              </Button>
+                              <Button
+                                onClick={() => setSelectedSource(source.name)}
+                                size="sm"
+                              >
+                                <Eye className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                {t('review')}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                onClick={() => setSelectedSource(source.name)}
+                                size="sm"
+                              >
+                                <Eye className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                {t('review')}
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setRenaming(source.name);
+                                  setNewName(source.name);
+                                }}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <FileEdit className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                {t('rename')}
+                              </Button>
+                              <Button
+                                onClick={() => handleDelete(source.name)}
+                                disabled={deleting === source.name}
+                                variant="destructive"
+                                size="icon"
+                                title={tCommon('delete')}
+                              >
+                                {deleting === source.name ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
