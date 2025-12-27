@@ -159,17 +159,13 @@ export default function NotebooksPage() {
                       onClick={() => handleDelete(notebook.notebook_id)}
                       disabled={deletingId === notebook.notebook_id}
                       variant="destructive"
+                      size="icon"
+                      title="Delete notebook"
                     >
                       {deletingId === notebook.notebook_id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Deleting...
-                        </>
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </>
+                        <Trash2 className="h-4 w-4" />
                       )}
                     </Button>
                   </CardFooter>

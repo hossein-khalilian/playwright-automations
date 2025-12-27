@@ -366,18 +366,13 @@ export default function SourceManager({
                             onClick={() => handleDelete(source.name)}
                             disabled={deleting === source.name}
                             variant="destructive"
-                            size="sm"
+                            size="icon"
+                            title="Delete"
                           >
                             {deleting === source.name ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                Deleting...
-                              </>
+                              <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <>
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </>
+                              <Trash2 className="h-4 w-4" />
                             )}
                           </Button>
                         </>

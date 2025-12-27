@@ -155,18 +155,13 @@ export default function ChatInterface({
             onClick={handleDeleteHistory}
             disabled={deleting || loading || sending}
             variant="destructive"
-            size="sm"
+            size="icon"
+            title="Clear History"
           >
             {deleting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                Deleting...
-              </>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear History
-              </>
+              <Trash2 className="h-4 w-4" />
             )}
           </Button>
         </div>

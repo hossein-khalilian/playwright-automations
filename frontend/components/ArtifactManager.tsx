@@ -220,18 +220,13 @@ export default function ArtifactManager({
                         onClick={() => handleDelete(artifact.name || '')}
                         disabled={deleting === artifact.name}
                         variant="destructive"
-                        size="sm"
+                        size="icon"
+                        title="Delete"
                       >
                         {deleting === artifact.name ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Deleting...
-                          </>
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </>
+                          <Trash2 className="h-4 w-4" />
                         )}
                       </Button>
                     </div>
