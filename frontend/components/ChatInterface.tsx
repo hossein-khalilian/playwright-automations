@@ -135,70 +135,70 @@ export default function ChatInterface({
   return (
     <Card className="flex h-[600px] flex-col">
       {/* Header */}
-      <CardHeader className={`flex flex-row items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between space-y-0 pb-4`}>
-        <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'}`}>
+      <CardHeader className={`flex flex-row items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between space-y-0 pb-4 gap-4`}>
+        <div className="flex items-center">
           <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('title')}</CardTitle>
         </div>
-            <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
-              {loading ? (
-                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'} text-sm text-muted-foreground`}>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span dir="auto">{t('loading')}</span>
-                </div>
-              ) : isRTL ? (
-                <>
-                  <Button
-                    onClick={handleDeleteHistory}
-                    disabled={deleting || loading || sending}
-                    variant="destructive"
-                    size="icon"
-                    title={t('clearHistory')}
-                  >
-                    {deleting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    onClick={onMessagesChange}
-                    disabled={loading || sending}
-                    variant="outline"
-                    size="sm"
-                    title={t('reloadTitle')}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
-                    {t('reload')}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    onClick={onMessagesChange}
-                    disabled={loading || sending}
-                    variant="outline"
-                    size="sm"
-                    title={t('reloadTitle')}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
-                    {t('reload')}
-                  </Button>
-                  <Button
-                    onClick={handleDeleteHistory}
-                    disabled={deleting || loading || sending}
-                    variant="destructive"
-                    size="icon"
-                    title={t('clearHistory')}
-                  >
-                    {deleting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </>
-              )}
+        <div className="flex items-center gap-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span dir="auto">{t('loading')}</span>
             </div>
+          ) : isRTL ? (
+            <>
+              <Button
+                onClick={handleDeleteHistory}
+                disabled={deleting || loading || sending}
+                variant="destructive"
+                size="icon"
+                title={t('clearHistory')}
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                onClick={onMessagesChange}
+                disabled={loading || sending}
+                variant="outline"
+                size="sm"
+                title={t('reloadTitle')}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                {t('reload')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={onMessagesChange}
+                disabled={loading || sending}
+                variant="outline"
+                size="sm"
+                title={t('reloadTitle')}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                {t('reload')}
+              </Button>
+              <Button
+                onClick={handleDeleteHistory}
+                disabled={deleting || loading || sending}
+                variant="destructive"
+                size="icon"
+                title={t('clearHistory')}
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </CardHeader>
 
       {/* Messages */}
@@ -255,7 +255,7 @@ export default function ChatInterface({
       )}
 
       <form onSubmit={handleSend} className="border-t px-6 py-4">
-        <div className={`flex ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'}`}>
+        <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <Input
             type="text"
             value={query}
