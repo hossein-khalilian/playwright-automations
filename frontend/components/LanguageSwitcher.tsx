@@ -26,11 +26,13 @@ export default function LanguageSwitcher() {
     router.replace(pathname as any, { locale: newLocale });
   };
 
+  const isRTL = locale === 'fa';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <Globe className="h-4 w-4 mr-2" />
+          <Globe className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
           {localeNames[locale] || locale.toUpperCase()}
         </Button>
       </DropdownMenuTrigger>

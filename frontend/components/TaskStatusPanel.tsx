@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from 'next-intl';
 import { useTasks } from '@/contexts/TaskContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function TaskStatusPanel() {
   const { tasks, pendingCount, clearCompleted } = useTasks();
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const [open, setOpen] = useState(false);
 
   if (tasks.length === 0) {
@@ -28,7 +31,7 @@ export default function TaskStatusPanel() {
         <Button variant="outline" size="sm" title="View background tasks">
           Tasks
           {pendingCount > 0 && (
-            <Badge variant="default" className="ml-1">
+            <Badge variant="default" className={isRTL ? 'mr-1' : 'ml-1'}>
               {pendingCount}
             </Badge>
           )}
@@ -54,8 +57,8 @@ export default function TaskStatusPanel() {
           {tasks.map((task) => (
             <DropdownMenuItem key={task.id} className="block p-0" onSelect={(e) => e.preventDefault()}>
               <div className="w-full border-b px-3 py-2 last:border-b-0">
-                <div className="flex items-center justify-between">
-                  <div className="mr-2 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
                     <div className="text-xs font-medium text-foreground">
                       {task.label || task.type || 'NotebookLM task'}
                     </div>
@@ -78,7 +81,7 @@ export default function TaskStatusPanel() {
                         ? 'default'
                         : 'destructive'
                     }
-                    className="ml-1 text-[10px]"
+                    className="text-[10px]"
                   >
                     {task.status === 'pending'
                       ? 'Pending'

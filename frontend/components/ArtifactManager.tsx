@@ -121,11 +121,11 @@ export default function ArtifactManager({
       {/* Artifacts List */}
       <Card>
         <CardHeader>
-          <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
+          <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between gap-4`}>
             <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('title')}</CardTitle>
-            <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+            <div className="flex items-center gap-3">
               {loading ? (
-                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'} text-sm text-muted-foreground`}>
+                <div className={`flex items-center gap-2 text-sm text-muted-foreground`}>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span dir="auto">{tCommon('loading')}</span>
                 </div>
@@ -158,9 +158,9 @@ export default function ArtifactManager({
             <ul className="divide-y divide-border">
               {artifacts.map((artifact, idx) => (
                 <li key={idx} className="py-4">
-                  <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
+                  <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between gap-4`}>
                     <div className={`flex-1 ${isRTL ? 'text-right' : ''}`}>
-                      <div className={`flex items-center ${isRTL ? 'space-x-3 justify-end' : 'space-x-3'}`}>
+                      <div className={`flex items-center gap-3 ${isRTL ? 'justify-end' : ''}`}>
                         <h3 className="text-sm font-medium text-foreground" dir="auto">
                           {artifact.name || t('artifactLabel', { index: idx + 1 })}
                         </h3>
@@ -183,7 +183,7 @@ export default function ArtifactManager({
                         <p className="mt-1 text-xs text-muted-foreground" dir="auto">{artifact.details}</p>
                       )}
                     </div>
-                    <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+                    <div className="flex items-center gap-3">
                       {isRTL ? (
                         <>
                           <Button

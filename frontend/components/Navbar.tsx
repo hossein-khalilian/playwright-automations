@@ -2,7 +2,7 @@
 
 import { Link, useRouter } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import TaskStatusPanel from './TaskStatusPanel';
 import LanguageSwitcher from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const router = useRouter();
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('navbar');
   const tAuth = useTranslations('auth');
 
@@ -34,17 +36,34 @@ export default function Navbar() {
               {t('notebooks')}
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
-            <TaskStatusPanel />
-            <LanguageSwitcher />
-            <span className="text-sm text-muted-foreground">{t('welcomeUser', { user: user || '' })}</span>
-            <Button
-              onClick={handleLogout}
-              variant="default"
-              size="sm"
-            >
-              {tAuth('logout')}
-            </Button>
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {isRTL ? (
+              <>
+                <Button
+                  onClick={handleLogout}
+                  variant="default"
+                  size="sm"
+                >
+                  {tAuth('logout')}
+                </Button>
+                <span className="text-sm text-muted-foreground">{t('welcomeUser', { user: user || '' })}</span>
+                <LanguageSwitcher />
+                <TaskStatusPanel />
+              </>
+            ) : (
+              <>
+                <TaskStatusPanel />
+                <LanguageSwitcher />
+                <span className="text-sm text-muted-foreground">{t('welcomeUser', { user: user || '' })}</span>
+                <Button
+                  onClick={handleLogout}
+                  variant="default"
+                  size="sm"
+                >
+                  {tAuth('logout')}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
