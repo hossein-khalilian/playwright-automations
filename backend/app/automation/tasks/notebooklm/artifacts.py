@@ -1,9 +1,12 @@
 """Sync artifact management operations for NotebookLM automation."""
 
+import os
 import re
 import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from PIL import Image
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
@@ -518,6 +521,55 @@ def download_artifact(
         else:
             # If suggested_filename is a property, access it directly
             suggested_filename = download.suggested_filename
+        
+        # Convert mindmap from PNG to JPEG if needed
+        if artifact_type == "mind_map" and download_path:
+            download_path_str = str(download_path)
+            # Check if the file is PNG (or any image format) and convert to JPEG
+            if os.path.exists(download_path_str):
+                try:
+                    # Open the image
+                    img = Image.open(download_path_str)
+                    
+                    # Convert RGBA to RGB if necessary (JPEG doesn't support transparency)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        # Create a white background
+                        rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        img = rgb_img
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Create new filename with .jpg extension
+                    original_path = Path(download_path_str)
+                    jpeg_path = original_path.with_suffix('.jpg')
+                    
+                    # Save as JPEG with high quality
+                    img.save(str(jpeg_path), 'JPEG', quality=95, optimize=True)
+                    
+                    # Remove the original PNG file if it's different from the JPEG file
+                    if jpeg_path != original_path:
+                        try:
+                            os.remove(download_path_str)
+                        except Exception:
+                            # If removal fails, continue anyway
+                            pass
+                    
+                    # Update download_path and filename to point to JPEG
+                    download_path = str(jpeg_path)
+                    
+                    # Update suggested filename to use .jpg extension
+                    if suggested_filename:
+                        filename_path = Path(suggested_filename)
+                        suggested_filename = str(filename_path.with_suffix('.jpg'))
+                    else:
+                        suggested_filename = f"{artifact_name}.jpg"
+                except Exception as exc:
+                    # If conversion fails, log but continue with original file
+                    # This ensures the download still works even if conversion fails
+                    pass
         
         return {
             "status": "success",
