@@ -202,7 +202,7 @@ export default function SourceManager({
       {/* Upload Section */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('uploadSource')}</CardTitle>
+          <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('uploadSource')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -249,7 +249,7 @@ export default function SourceManager({
                       </>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground" dir="auto">
                     {t('supportedFormats')}
                   </p>
                 </div>
@@ -313,7 +313,7 @@ export default function SourceManager({
       {/* Add URLs Section */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('addUrlSources')}</CardTitle>
+          <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('addUrlSources')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
@@ -340,7 +340,7 @@ export default function SourceManager({
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" dir="auto">
             {t('urlsHint')}
           </p>
         </CardContent>
@@ -350,24 +350,25 @@ export default function SourceManager({
       <Card>
         <CardHeader>
           <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
-            <CardTitle>{t('title')}</CardTitle>
+            <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('title')}</CardTitle>
             <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
-              {loading && (
-                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'} text-sm text-muted-foreground`}>
+              {loading ? (
+                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'} text-sm text-muted-foreground`}>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{tCommon('loading')}</span>
+                  <span dir="auto">{tCommon('loading')}</span>
                 </div>
+              ) : (
+                <Button
+                  onClick={onSourcesChange}
+                  disabled={loading}
+                  variant="outline"
+                  size="sm"
+                  title={t('reloadTitle')}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                  {t('reload')}
+                </Button>
               )}
-              <Button
-                onClick={onSourcesChange}
-                disabled={loading}
-                variant="outline"
-                size="sm"
-                title={t('reloadTitle')}
-              >
-                <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
-                {t('reload')}
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -375,11 +376,11 @@ export default function SourceManager({
           {loading && sources.length === 0 ? (
             <div className="text-center py-8">
               <Loader2 className="inline-block h-8 w-8 animate-spin" />
-              <p className="mt-4 text-muted-foreground">{t('loadingSources')}</p>
+              <p className="mt-4 text-center text-muted-foreground" dir="auto">{t('loadingSources')}</p>
             </div>
           ) : sources.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              {t('noSourcesSimple')}
+              <span className="text-center" dir="auto">{t('noSourcesSimple')}</span>
             </div>
           ) : (
             <ul className="divide-y divide-border">

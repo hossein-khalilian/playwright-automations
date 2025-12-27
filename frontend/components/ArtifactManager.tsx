@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { artifactApi } from '@/lib/api-client';
 import type { ArtifactInfo } from '@/lib/types';
 import ArtifactCreateModal from './ArtifactCreateModal';
@@ -24,6 +24,8 @@ export default function ArtifactManager({
   onArtifactsChange,
   loading = false,
 }: ArtifactManagerProps) {
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('artifacts');
   const tCommon = useTranslations('common');
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export default function ArtifactManager({
       {/* Create Artifact Section */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('createArtifact')}</CardTitle>
+          <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('createArtifact')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -119,25 +121,26 @@ export default function ArtifactManager({
       {/* Artifacts List */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{t('title')}</CardTitle>
-            <div className="flex items-center space-x-2">
-              {loading && (
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
+            <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('title')}</CardTitle>
+            <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+              {loading ? (
+                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'} text-sm text-muted-foreground`}>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{tCommon('loading')}</span>
+                  <span dir="auto">{tCommon('loading')}</span>
                 </div>
+              ) : (
+                <Button
+                  onClick={onArtifactsChange}
+                  disabled={loading}
+                  variant="outline"
+                  size="sm"
+                  title={t('reloadTitle')}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                  {t('reload')}
+                </Button>
               )}
-              <Button
-                onClick={onArtifactsChange}
-                disabled={loading}
-                variant="outline"
-                size="sm"
-                title={t('reloadTitle')}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                {t('reload')}
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -145,24 +148,24 @@ export default function ArtifactManager({
           {loading && artifacts.length === 0 ? (
             <div className="text-center py-8">
               <Loader2 className="inline-block h-8 w-8 animate-spin" />
-              <p className="mt-4 text-muted-foreground">{t('loadingArtifacts')}</p>
+              <p className="mt-4 text-center text-muted-foreground" dir="auto">{t('loadingArtifacts')}</p>
             </div>
           ) : artifacts.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              {t('noArtifacts')}
+              <span className="text-center" dir="auto">{t('noArtifacts')}</span>
             </div>
           ) : (
             <ul className="divide-y divide-border">
               {artifacts.map((artifact, idx) => (
                 <li key={idx} className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-sm font-medium text-foreground">
+                  <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between`}>
+                    <div className={`flex-1 ${isRTL ? 'text-right' : ''}`}>
+                      <div className={`flex items-center ${isRTL ? 'space-x-3 justify-end' : 'space-x-3'}`}>
+                        <h3 className="text-sm font-medium text-foreground" dir="auto">
                           {artifact.name || t('artifactLabel', { index: idx + 1 })}
                         </h3>
                         {artifact.type && (
-                          <span className="text-xs text-muted-foreground">({artifact.type})</span>
+                          <span className="text-xs text-muted-foreground" dir="auto">({artifact.type})</span>
                         )}
                         <Badge
                           variant={
@@ -173,65 +176,123 @@ export default function ArtifactManager({
                               : 'outline'
                           }
                         >
-                          {artifact.is_generating ? t('generating') : artifact.status}
+                          <span dir="auto">{artifact.is_generating ? t('generating') : artifact.status}</span>
                         </Badge>
                       </div>
                       {artifact.details && (
-                        <p className="mt-1 text-xs text-muted-foreground">{artifact.details}</p>
+                        <p className="mt-1 text-xs text-muted-foreground" dir="auto">{artifact.details}</p>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
-                      {/* Note: Play button removed for audio/video - they use download instead */}
-                      {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
-                        <Button
-                          onClick={() => handleDownload(artifact.name || '')}
-                          disabled={downloading === artifact.name}
-                          size="sm"
-                          title={
-                            artifact.type === 'mind_map'
-                              ? t('downloadMindmap')
-                              : artifact.type === 'video_overview'
-                              ? t('downloadVideo')
-                              : artifact.type === 'audio_overview'
-                              ? t('downloadAudio')
-                              : artifact.type === 'infographic'
-                              ? t('downloadInfographic')
-                              : artifact.type === 'flashcards'
-                              ? t('downloadFlashcards')
-                              : artifact.type === 'slide_deck'
-                              ? t('downloadSlideDeck')
-                              : artifact.type === 'reports'
-                              ? t('downloadReport')
-                              : t('downloadArtifact')
-                          }
-                        >
-                          {downloading === artifact.name ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              {t('downloading')}
-                            </>
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4 mr-1" />
-                              {t('download')}
-                            </>
+                    <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+                      {isRTL ? (
+                        <>
+                          <Button
+                            onClick={() => handleDelete(artifact.name || '')}
+                            disabled={deleting === artifact.name}
+                            variant="destructive"
+                            size="icon"
+                            title={tCommon('delete')}
+                          >
+                            {deleting === artifact.name ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                          {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
+                          {/* Note: Play button removed for audio/video - they use download instead */}
+                          {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
+                            <Button
+                              onClick={() => handleDownload(artifact.name || '')}
+                              disabled={downloading === artifact.name}
+                              size="sm"
+                              title={
+                                artifact.type === 'mind_map'
+                                  ? t('downloadMindmap')
+                                  : artifact.type === 'video_overview'
+                                  ? t('downloadVideo')
+                                  : artifact.type === 'audio_overview'
+                                  ? t('downloadAudio')
+                                  : artifact.type === 'infographic'
+                                  ? t('downloadInfographic')
+                                  : artifact.type === 'flashcards'
+                                  ? t('downloadFlashcards')
+                                  : artifact.type === 'slide_deck'
+                                  ? t('downloadSlideDeck')
+                                  : artifact.type === 'reports'
+                                  ? t('downloadReport')
+                                  : t('downloadArtifact')
+                              }
+                            >
+                              {downloading === artifact.name ? (
+                                <>
+                                  <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'} animate-spin`} />
+                                  {t('downloading')}
+                                </>
+                              ) : (
+                                <>
+                                  <Download className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                  {t('download')}
+                                </>
+                              )}
+                            </Button>
                           )}
-                        </Button>
+                        </>
+                      ) : (
+                        <>
+                          {/* Show download button for ready artifacts, mindmaps, infographics, flashcards, slide decks, and reports */}
+                          {/* Note: Play button removed for audio/video - they use download instead */}
+                          {(artifact.status === 'ready' || artifact.type === 'mind_map' || artifact.type === 'infographic' || artifact.type === 'flashcards' || artifact.type === 'slide_deck' || artifact.type === 'reports') && (
+                            <Button
+                              onClick={() => handleDownload(artifact.name || '')}
+                              disabled={downloading === artifact.name}
+                              size="sm"
+                              title={
+                                artifact.type === 'mind_map'
+                                  ? t('downloadMindmap')
+                                  : artifact.type === 'video_overview'
+                                  ? t('downloadVideo')
+                                  : artifact.type === 'audio_overview'
+                                  ? t('downloadAudio')
+                                  : artifact.type === 'infographic'
+                                  ? t('downloadInfographic')
+                                  : artifact.type === 'flashcards'
+                                  ? t('downloadFlashcards')
+                                  : artifact.type === 'slide_deck'
+                                  ? t('downloadSlideDeck')
+                                  : artifact.type === 'reports'
+                                  ? t('downloadReport')
+                                  : t('downloadArtifact')
+                              }
+                            >
+                              {downloading === artifact.name ? (
+                                <>
+                                  <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'} animate-spin`} />
+                                  {t('downloading')}
+                                </>
+                              ) : (
+                                <>
+                                  <Download className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                                  {t('download')}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => handleDelete(artifact.name || '')}
+                            disabled={deleting === artifact.name}
+                            variant="destructive"
+                            size="icon"
+                            title={tCommon('delete')}
+                          >
+                            {deleting === artifact.name ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
                       )}
-                      <Button
-                        onClick={() => handleDelete(artifact.name || '')}
-                        disabled={deleting === artifact.name}
-                        variant="destructive"
-                        size="icon"
-                        title={tCommon('delete')}
-                      >
-                        {deleting === artifact.name ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
                     </div>
                   </div>
                 </li>

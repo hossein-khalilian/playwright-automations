@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { chatApi } from '@/lib/api-client';
 import type { ChatMessage } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +25,8 @@ export default function ChatInterface({
   onMessagesChange,
   loading = false,
 }: ChatInterfaceProps) {
+  const locale = useLocale();
+  const isRTL = locale === 'fa';
   const t = useTranslations('chat');
   const tCommon = useTranslations('common');
   const [query, setQuery] = useState('');
@@ -133,41 +135,70 @@ export default function ChatInterface({
   return (
     <Card className="flex h-[600px] flex-col">
       {/* Header */}
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <div className="flex items-center space-x-2">
-          <CardTitle>{t('title')}</CardTitle>
-          {loading && (
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{t('loading')}</span>
+      <CardHeader className={`flex flex-row items-center ${isRTL ? 'flex-row-reverse' : ''} justify-between space-y-0 pb-4`}>
+        <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'}`}>
+          <CardTitle dir={isRTL ? 'rtl' : 'ltr'}>{t('title')}</CardTitle>
+        </div>
+            <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+              {loading ? (
+                <div className={`flex items-center ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'} text-sm text-muted-foreground`}>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span dir="auto">{t('loading')}</span>
+                </div>
+              ) : isRTL ? (
+                <>
+                  <Button
+                    onClick={handleDeleteHistory}
+                    disabled={deleting || loading || sending}
+                    variant="destructive"
+                    size="icon"
+                    title={t('clearHistory')}
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    onClick={onMessagesChange}
+                    disabled={loading || sending}
+                    variant="outline"
+                    size="sm"
+                    title={t('reloadTitle')}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                    {t('reload')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={onMessagesChange}
+                    disabled={loading || sending}
+                    variant="outline"
+                    size="sm"
+                    title={t('reloadTitle')}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                    {t('reload')}
+                  </Button>
+                  <Button
+                    onClick={handleDeleteHistory}
+                    disabled={deleting || loading || sending}
+                    variant="destructive"
+                    size="icon"
+                    title={t('clearHistory')}
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={onMessagesChange}
-            disabled={loading || sending}
-            variant="outline"
-            size="sm"
-            title={t('reloadTitle')}
-          >
-            <RefreshCw className="h-4 w-4 mr-1" />
-            {t('reload')}
-          </Button>
-          <Button
-            onClick={handleDeleteHistory}
-            disabled={deleting || loading || sending}
-            variant="destructive"
-            size="icon"
-            title={t('clearHistory')}
-          >
-            {deleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
       </CardHeader>
 
       {/* Messages */}
@@ -175,11 +206,11 @@ export default function ChatInterface({
         {loading && messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <Loader2 className="inline-block h-8 w-8 animate-spin" />
-            <p className="mt-4">{t('loadingHistory')}</p>
+            <p className="mt-4 text-center" dir="auto">{t('loadingHistory')}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            {t('noMessages')}
+            <span className="text-center" dir="auto">{t('noMessages')}</span>
           </div>
         ) : (
           messages.map((message, idx) => {
@@ -224,15 +255,15 @@ export default function ChatInterface({
       )}
 
       <form onSubmit={handleSend} className="border-t px-6 py-4">
-        <div className="flex space-x-2">
+        <div className={`flex ${isRTL ? 'space-x-reverse space-x-2 flex-row-reverse' : 'space-x-2'}`}>
           <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('placeholder')}
-            dir={queryRTL}
+            dir={isRTL ? 'rtl' : queryRTL}
             disabled={sending || loading}
-            className="flex-1"
+            className={`flex-1 ${isRTL ? 'text-right' : ''}`}
           />
           <Button
             type="submit"
@@ -240,7 +271,7 @@ export default function ChatInterface({
           >
             {sending ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
                 {t('sending')}
               </>
             ) : (
@@ -249,7 +280,7 @@ export default function ChatInterface({
           </Button>
         </div>
         {sending && (
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground" dir={isRTL ? 'rtl' : 'ltr'}>
             {t('sendingWait')}
           </p>
         )}
