@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { sourceApi } from '@/lib/api-client';
 import ReactMarkdown from 'react-markdown';
 import { getRTLClasses, getTextDirection } from '@/lib/rtl-utils';
@@ -25,6 +26,8 @@ export default function SourceReviewModal({
   sourceName,
   onClose,
 }: SourceReviewModalProps) {
+  const t = useTranslations('sourceReview');
+  const tCommon = useTranslations('common');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
@@ -57,11 +60,11 @@ export default function SourceReviewModal({
             images: [],
           });
         } else {
-          setError('Review completed but no details were returned.');
+          setError(t('reviewCompletedNoDetails'));
         }
       } catch (err: any) {
         const errorMessage =
-          err.response?.data?.detail || err.message || 'Failed to load source review';
+          err.response?.data?.detail || err.message || t('loadFailed');
         setError(errorMessage);
         console.error('Review error:', err);
       } finally {
@@ -75,13 +78,13 @@ export default function SourceReviewModal({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Source Review: {sourceName}</DialogTitle>
+          <DialogTitle>{t('title', { name: sourceName })}</DialogTitle>
         </DialogHeader>
 
         {loading ? (
           <div className="text-center py-8">
             <Loader2 className="inline-block h-8 w-8 animate-spin" />
-            <p className="mt-4 text-muted-foreground">Loading... This may take a moment.</p>
+            <p className="mt-4 text-muted-foreground">{t('loading')}</p>
           </div>
         ) : error ? (
           <Alert variant="destructive">
@@ -99,7 +102,7 @@ export default function SourceReviewModal({
             )}
             {data.title && (
               <div>
-                <h4 className="font-semibold text-foreground">Title</h4>
+                <h4 className="font-semibold text-foreground">{t('titleLabel')}</h4>
                 <p 
                   className="text-foreground"
                   dir={getTextDirection(data.title)}
@@ -111,7 +114,7 @@ export default function SourceReviewModal({
 
             {data.summary && (
               <div>
-                <h4 className="font-semibold text-foreground">Summary</h4>
+                <h4 className="font-semibold text-foreground">{t('summary')}</h4>
                 <div 
                   className="prose max-w-none prose-gray prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
                   dir={getTextDirection(data.summary)}
@@ -123,7 +126,7 @@ export default function SourceReviewModal({
 
             {data.key_topics && data.key_topics.length > 0 && (
               <div>
-                <h4 className="font-semibold text-foreground">Key Topics</h4>
+                <h4 className="font-semibold text-foreground">{t('keyTopics')}</h4>
                 <ul className={`list-disc space-y-1 ${contentRTL === 'rtl' ? 'list-inside pr-6' : 'list-inside pl-6'}`}>
                   {data.key_topics.map((topic: string, idx: number) => {
                     const topicRTL = getTextDirection(topic);
@@ -143,7 +146,7 @@ export default function SourceReviewModal({
 
             {data.content && (
               <div>
-                <h4 className="font-semibold text-foreground">Content</h4>
+                <h4 className="font-semibold text-foreground">{t('content')}</h4>
                 <div 
                   className="prose max-w-none prose-gray prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
                   dir={getTextDirection(data.content)}
@@ -155,7 +158,7 @@ export default function SourceReviewModal({
 
             {data.images && data.images.length > 0 && (
               <div>
-                <h4 className="font-semibold text-foreground">Images</h4>
+                <h4 className="font-semibold text-foreground">{t('images')}</h4>
                 <div className="grid grid-cols-2 gap-4">
                   {data.images.map((img: any, idx: number) => (
                     <div key={idx}>

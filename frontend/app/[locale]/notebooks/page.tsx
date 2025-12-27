@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslations } from 'next-intl';
 import { notebookApi } from '@/lib/api-client';
 import type { Notebook } from '@/lib/types';
 import Navbar from '@/components/Navbar';
@@ -15,6 +16,8 @@ import { Loader2, Plus, Trash2, FolderOpen } from 'lucide-react';
 export default function NotebooksPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useTranslations('notebooks');
+  const tCommon = useTranslations('common');
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -39,7 +42,7 @@ export default function NotebooksPage() {
       const response = await notebookApi.list();
       setNotebooks(response.notebooks);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load notebooks');
+      setError(err.response?.data?.detail || t('loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -51,10 +54,10 @@ export default function NotebooksPage() {
       setError('');
       setInfo('');
       const status = await notebookApi.create();
-      setInfo(status.message || 'Notebook creation submitted.');
+      setInfo(status.message || t('createSubmitted'));
       await loadNotebooks();
     } catch (err: any) {
-      const message = err.response?.data?.detail || err.message || 'Failed to create notebook';
+      const message = err.response?.data?.detail || err.message || t('createFailed');
       setError(message);
     } finally {
       setCreating(false);
@@ -63,7 +66,7 @@ export default function NotebooksPage() {
 
   const handleDelete = async (notebookId: string) => {
     if (deletingId) return;
-    if (!confirm('Are you sure you want to delete this notebook?')) {
+    if (!confirm(t('deleteConfirm'))) {
       return;
     }
 
@@ -71,10 +74,10 @@ export default function NotebooksPage() {
       setDeletingId(notebookId);
       setInfo('');
       const status = await notebookApi.delete(notebookId);
-      setInfo(status.message || 'Notebook deletion submitted.');
+      setInfo(status.message || t('deleteSubmitted'));
       await loadNotebooks();
     } catch (err: any) {
-      const message = err.response?.data?.detail || err.message || 'Failed to delete notebook';
+      const message = err.response?.data?.detail || err.message || t('deleteFailed');
       setError(message);
     } finally {
       setDeletingId(null);
@@ -88,7 +91,7 @@ export default function NotebooksPage() {
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <Loader2 className="inline-block h-8 w-8 animate-spin" />
-            <p className="mt-4 text-muted-foreground">Loading...</p>
+            <p className="mt-4 text-muted-foreground">{tCommon('loading')}</p>
           </div>
         </div>
       </>
@@ -101,7 +104,7 @@ export default function NotebooksPage() {
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">My Notebooks</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
             <Button
               onClick={handleCreate}
               disabled={creating}
@@ -109,12 +112,12 @@ export default function NotebooksPage() {
               {creating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
+                  {t('creating')}
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Notebook
+                  {t('createNotebook')}
                 </>
               )}
             </Button>
@@ -134,7 +137,7 @@ export default function NotebooksPage() {
           {notebooks.length === 0 ? (
             <Card className="p-12 text-center">
               <CardContent>
-                <p className="text-muted-foreground">No notebooks yet. Create your first notebook!</p>
+                <p className="text-muted-foreground">{t('noNotebooks')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -144,7 +147,7 @@ export default function NotebooksPage() {
                   <CardHeader>
                     <CardTitle className="text-lg">{notebook.notebook_id}</CardTitle>
                     <CardDescription>
-                      Created: {format(new Date(notebook.created_at), 'PPp')}
+                      {t('created')}: {format(new Date(notebook.created_at), 'PPp')}
                     </CardDescription>
                   </CardHeader>
                   <CardFooter className="flex space-x-2">
@@ -153,14 +156,14 @@ export default function NotebooksPage() {
                       className="flex-1"
                     >
                       <FolderOpen className="h-4 w-4 mr-2" />
-                      Open
+                      {tCommon('open')}
                     </Button>
                     <Button
                       onClick={() => handleDelete(notebook.notebook_id)}
                       disabled={deletingId === notebook.notebook_id}
                       variant="destructive"
                       size="icon"
-                      title="Delete notebook"
+                      title={tCommon('delete')}
                     >
                       {deletingId === notebook.notebook_id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,31 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { routing } from '@/i18n/config';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
-
-export default function Home() {
-  const { isAuthenticated, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading) {
-      if (isAuthenticated) {
-        router.push('/notebooks');
-      } else {
-        router.push('/login');
-      }
-    }
-  }, [isAuthenticated, loading, router]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="inline-block h-8 w-8 animate-spin" />
-        <p className="mt-4 text-muted-foreground">Loading...</p>
-      </div>
-    </div>
-  );
+export default function RootPage() {
+  redirect(`/${routing.defaultLocale}`);
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { sourceApi } from '@/lib/api-client';
 import type { Source } from '@/lib/types';
 import SourceReviewModal from './SourceReviewModal';
@@ -25,6 +26,8 @@ export default function SourceManager({
   onSourcesChange,
   loading = false,
 }: SourceManagerProps) {
+  const t = useTranslations('sources');
+  const tCommon = useTranslations('common');
   const [uploading, setUploading] = useState(false);
   const [addingUrls, setAddingUrls] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -55,14 +58,14 @@ export default function SourceManager({
       setError('');
       setInfo('');
       const status = await sourceApi.upload(notebookId, selectedFile);
-      setInfo(status.message || 'Upload submitted. Processing...');
+      setInfo(status.message || t('uploadSubmitted'));
       setSelectedFile(null);
       // Small delay before reloading to allow processing
       await new Promise(resolve => setTimeout(resolve, 1000));
       // Reload sources after upload
       await onSourcesChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to upload source';
+      const errorMessage = err.response?.data?.detail || err.message || t('uploadFailed');
       setError(errorMessage);
       console.error('Upload error:', err);
     } finally {
@@ -72,7 +75,7 @@ export default function SourceManager({
 
   const handleAddUrls = async () => {
     if (!urls.trim()) {
-      setError('Please enter at least one URL');
+      setError(t('urlsRequired'));
       return;
     }
 
@@ -81,14 +84,14 @@ export default function SourceManager({
       setError('');
       setInfo('');
       const status = await sourceApi.addUrls(notebookId, urls.trim());
-      setInfo(status.message || 'URLs submitted. Processing...');
+      setInfo(status.message || t('urlsSubmitted'));
       setUrls('');
       // Small delay before reloading to allow processing
       await new Promise(resolve => setTimeout(resolve, 1000));
       // Reload sources after adding URLs
       await onSourcesChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to add URL sources';
+      const errorMessage = err.response?.data?.detail || err.message || t('addUrlsFailed');
       setError(errorMessage);
       console.error('Add URLs error:', err);
     } finally {
@@ -97,7 +100,7 @@ export default function SourceManager({
   };
 
   const handleDelete = async (sourceName: string) => {
-    if (!confirm(`Are you sure you want to delete "${sourceName}"?`)) {
+    if (!confirm(t('deleteConfirm', { name: sourceName }))) {
       return;
     }
 
@@ -106,10 +109,10 @@ export default function SourceManager({
       setError('');
       setInfo('');
       const status = await sourceApi.delete(notebookId, sourceName);
-      setInfo(status.message || 'Delete submitted.');
+      setInfo(status.message || t('deleteSubmitted'));
       await onSourcesChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete source';
+      const errorMessage = err.response?.data?.detail || err.message || t('deleteFailed');
       setError(errorMessage);
       console.error('Delete error:', err);
     } finally {
@@ -129,12 +132,12 @@ export default function SourceManager({
       setError('');
       setInfo('');
       const status = await sourceApi.rename(notebookId, sourceName, newName.trim());
-      setInfo(status.message || 'Rename submitted.');
+      setInfo(status.message || t('renameSubmitted'));
       setRenaming(null);
       setNewName('');
       await onSourcesChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to rename source';
+      const errorMessage = err.response?.data?.detail || err.message || t('renameFailed');
       setError(errorMessage);
       console.error('Rename error:', err);
     } finally {
@@ -159,7 +162,7 @@ export default function SourceManager({
       {/* Upload Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Upload Source</CardTitle>
+          <CardTitle>{t('uploadSource')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -184,7 +187,7 @@ export default function SourceManager({
                   variant="outline"
                   size="sm"
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   onClick={handleFileUpload}
@@ -194,10 +197,10 @@ export default function SourceManager({
                   {uploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
+                      {t('uploading')}
                     </>
                   ) : (
-                    'Upload'
+                    tCommon('upload')
                   )}
                 </Button>
               </div>
@@ -209,13 +212,13 @@ export default function SourceManager({
       {/* Add URLs Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Add URL Sources</CardTitle>
+          <CardTitle>{t('addUrlSources')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
-            placeholder="Paste URLs here, one per line or separated by spaces&#10;Example:&#10;https://example.com/page1&#10;https://example.com/page2"
+            placeholder={t('urlsPlaceholder')}
             disabled={addingUrls}
             rows={6}
           />
@@ -227,15 +230,15 @@ export default function SourceManager({
               {addingUrls ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
+                  {t('adding')}
                 </>
               ) : (
-                'Add URLs'
+                t('addUrls')
               )}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            To add multiple URLs, separate them with a new line or space.
+            {t('urlsHint')}
           </p>
         </CardContent>
       </Card>
@@ -244,12 +247,12 @@ export default function SourceManager({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Sources</CardTitle>
+            <CardTitle>{t('title')}</CardTitle>
             <div className="flex items-center space-x-2">
               {loading && (
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading...</span>
+                  <span>{tCommon('loading')}</span>
                 </div>
               )}
               <Button
@@ -257,10 +260,10 @@ export default function SourceManager({
                 disabled={loading}
                 variant="outline"
                 size="sm"
-                title="Reload sources"
+                title={t('reloadTitle')}
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
-                Reload
+                {t('reload')}
               </Button>
             </div>
           </div>
@@ -269,11 +272,11 @@ export default function SourceManager({
           {loading && sources.length === 0 ? (
             <div className="text-center py-8">
               <Loader2 className="inline-block h-8 w-8 animate-spin" />
-              <p className="mt-4 text-muted-foreground">Loading sources...</p>
+              <p className="mt-4 text-muted-foreground">{t('loadingSources')}</p>
             </div>
           ) : sources.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              No sources uploaded yet. Upload a file to get started.
+              {t('noSourcesSimple')}
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -304,7 +307,7 @@ export default function SourceManager({
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                             disabled={renamingSubmitting === source.name}
-                            placeholder="New name"
+                            placeholder={t('newName')}
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -324,10 +327,10 @@ export default function SourceManager({
                             {renamingSubmitting === source.name ? (
                               <>
                                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Saving...
+                                {t('saving')}
                               </>
                             ) : (
-                              'Save'
+                              tCommon('save')
                             )}
                           </Button>
                           <Button
@@ -339,7 +342,7 @@ export default function SourceManager({
                             variant="outline"
                             size="sm"
                           >
-                            Cancel
+                            {tCommon('cancel')}
                           </Button>
                         </div>
                       ) : (
@@ -349,7 +352,7 @@ export default function SourceManager({
                             size="sm"
                           >
                             <Eye className="h-4 w-4 mr-1" />
-                            Review
+                            {t('review')}
                           </Button>
                           <Button
                             onClick={() => {
@@ -360,14 +363,14 @@ export default function SourceManager({
                             size="sm"
                           >
                             <FileEdit className="h-4 w-4 mr-1" />
-                            Rename
+                            {t('rename')}
                           </Button>
                           <Button
                             onClick={() => handleDelete(source.name)}
                             disabled={deleting === source.name}
                             variant="destructive"
                             size="icon"
-                            title="Delete"
+                            title={tCommon('delete')}
                           >
                             {deleting === source.name ? (
                               <Loader2 className="h-4 w-4 animate-spin" />

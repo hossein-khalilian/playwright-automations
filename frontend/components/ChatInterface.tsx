@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { chatApi } from '@/lib/api-client';
 import type { ChatMessage } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
@@ -24,6 +25,8 @@ export default function ChatInterface({
   onMessagesChange,
   loading = false,
 }: ChatInterfaceProps) {
+  const t = useTranslations('chat');
+  const tCommon = useTranslations('common');
   const [query, setQuery] = useState('');
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -100,7 +103,7 @@ export default function ChatInterface({
         onMessagesChange();
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to send query';
+      const errorMessage = err.response?.data?.detail || err.message || t('sendFailed');
       setError(errorMessage);
       console.error('Query error:', err);
     } finally {
@@ -109,7 +112,7 @@ export default function ChatInterface({
   };
 
   const handleDeleteHistory = async () => {
-    if (!confirm('Are you sure you want to delete all chat history?')) {
+    if (!confirm(t('deleteConfirm'))) {
       return;
     }
 
@@ -119,7 +122,7 @@ export default function ChatInterface({
       await chatApi.deleteHistory(notebookId);
       onMessagesChange();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete chat history';
+      const errorMessage = err.response?.data?.detail || err.message || t('deleteFailed');
       setError(errorMessage);
       console.error('Delete history error:', err);
     } finally {
@@ -132,11 +135,11 @@ export default function ChatInterface({
       {/* Header */}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <div className="flex items-center space-x-2">
-          <CardTitle>Chat</CardTitle>
+          <CardTitle>{t('title')}</CardTitle>
           {loading && (
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading...</span>
+              <span>{t('loading')}</span>
             </div>
           )}
         </div>
@@ -146,17 +149,17 @@ export default function ChatInterface({
             disabled={loading || sending}
             variant="outline"
             size="sm"
-            title="Reload chat history"
+            title={t('reloadTitle')}
           >
             <RefreshCw className="h-4 w-4 mr-1" />
-            Reload
+            {t('reload')}
           </Button>
           <Button
             onClick={handleDeleteHistory}
             disabled={deleting || loading || sending}
             variant="destructive"
             size="icon"
-            title="Clear History"
+            title={t('clearHistory')}
           >
             {deleting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -172,11 +175,11 @@ export default function ChatInterface({
         {loading && messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <Loader2 className="inline-block h-8 w-8 animate-spin" />
-            <p className="mt-4">Loading chat history...</p>
+            <p className="mt-4">{t('loadingHistory')}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            No messages yet. Start a conversation!
+            {t('noMessages')}
           </div>
         ) : (
           messages.map((message, idx) => {
@@ -226,7 +229,7 @@ export default function ChatInterface({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask a question..."
+            placeholder={t('placeholder')}
             dir={queryRTL}
             disabled={sending || loading}
             className="flex-1"
@@ -238,16 +241,16 @@ export default function ChatInterface({
             {sending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
+                {t('sending')}
               </>
             ) : (
-              'Send'
+              t('send')
             )}
           </Button>
         </div>
         {sending && (
           <p className="mt-2 text-xs text-muted-foreground">
-            This may take a while. Please wait...
+            {t('sendingWait')}
           </p>
         )}
       </form>

@@ -1,22 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, Link } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { register, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useTranslations('auth');
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -33,13 +36,29 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (password !== confirmPassword) {
+      setError(t('passwordsNoMatch'));
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(t('passwordTooShort'));
+      return;
+    }
+
+    if (username.length < 3) {
+      setError(t('usernameTooShort'));
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(username, password);
+      await register(username, password);
       router.push('/notebooks');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      setError(err.response?.data?.detail || t('registrationFailed'));
     } finally {
       setLoading(false);
     }
@@ -47,9 +66,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-3xl text-center">Sign in to your account</CardTitle>
+          <CardTitle className="text-3xl text-center">{t('createAccount')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-6" onSubmit={handleSubmit}>
@@ -60,27 +82,39 @@ export default function LoginPage() {
             )}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">{t('username')}</Label>
                 <Input
                   id="username"
                   name="username"
                   type="text"
                   required
-                  placeholder="Username"
+                  placeholder={t('usernameMinLength')}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('password')}</Label>
                 <Input
                   id="password"
                   name="password"
                   type="password"
                   required
-                  placeholder="Password"
+                  placeholder={t('passwordMinLength')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  placeholder={t('confirmPasswordPlaceholder')}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
             </div>
@@ -90,15 +124,15 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('creatingAccount') : t('register')}
             </Button>
 
             <div className="text-center text-sm">
               <Link
-                href="/register"
+                href="/login"
                 className="text-primary hover:underline"
               >
-                Don&apos;t have an account? Register here
+                {t('haveAccount')}
               </Link>
             </div>
           </form>

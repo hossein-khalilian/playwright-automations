@@ -1,3 +1,7 @@
+const createNextIntlPlugin = require('next-intl/plugin');
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -8,4 +12,4 @@ const nextConfig = {
   allowedDevOrigins: process.env.PUBLIC_URL ? [process.env.PUBLIC_URL] : [],
 };
 
-module.exports = nextConfig;
+module.exports = withNextIntl(nextConfig);

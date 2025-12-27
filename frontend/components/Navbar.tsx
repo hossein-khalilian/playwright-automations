@@ -1,14 +1,17 @@
 'use client';
 
-import Link from 'next/link';
+import { Link, useRouter } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import TaskStatusPanel from './TaskStatusPanel';
+import LanguageSwitcher from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 
 export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const router = useRouter();
+  const t = useTranslations('navbar');
+  const tAuth = useTranslations('auth');
 
   const handleLogout = () => {
     logout();
@@ -28,18 +31,19 @@ export default function Navbar() {
               href="/notebooks"
               className="inline-flex items-center border-b-2 border-primary px-1 pt-1 text-sm font-medium text-foreground transition-colors hover:text-primary"
             >
-              Notebooks
+              {t('notebooks')}
             </Link>
           </div>
           <div className="flex items-center space-x-4">
             <TaskStatusPanel />
-            <span className="text-sm text-muted-foreground">Welcome, {user}</span>
+            <LanguageSwitcher />
+            <span className="text-sm text-muted-foreground">{t('welcomeUser', { user: user || '' })}</span>
             <Button
               onClick={handleLogout}
               variant="default"
               size="sm"
             >
-              Logout
+              {tAuth('logout')}
             </Button>
           </div>
         </div>

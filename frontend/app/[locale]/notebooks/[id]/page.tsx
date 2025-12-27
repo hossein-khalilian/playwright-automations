@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslations } from 'next-intl';
 import {
   sourceApi,
   chatApi,
@@ -27,6 +29,11 @@ export default function NotebookDetailPage() {
   const router = useRouter();
   const params = useParams();
   const notebookId = params.id as string;
+  const t = useTranslations('notebooks');
+  const tCommon = useTranslations('common');
+  const tSources = useTranslations('sources');
+  const tChat = useTranslations('chat');
+  const tArtifacts = useTranslations('artifacts');
 
   const [activeTab, setActiveTab] = useState<'sources' | 'chat' | 'artifacts'>(() => {
     if (typeof window !== 'undefined') {
@@ -67,7 +74,7 @@ export default function NotebookDetailPage() {
       const response = await sourceApi.list(notebookId);
       setSources(response.sources);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load sources';
+      const errorMessage = err.response?.data?.detail || err.message || tSources('loadFailed');
       setError(errorMessage);
       console.error('Failed to load sources:', err);
     } finally {
@@ -82,7 +89,7 @@ export default function NotebookDetailPage() {
       const response = await artifactApi.list(notebookId);
       setArtifacts(response.artifacts);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load artifacts';
+      const errorMessage = err.response?.data?.detail || err.message || tArtifacts('loadFailed');
       setError(errorMessage);
       console.error('Failed to load artifacts:', err);
     } finally {
@@ -97,7 +104,7 @@ export default function NotebookDetailPage() {
       const response = await chatApi.getHistory(notebookId);
       setChatMessages(response.messages);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to load chat history';
+      const errorMessage = err.response?.data?.detail || err.message || tChat('loadFailed');
       setError(errorMessage);
       console.error('Failed to load chat history:', err);
     } finally {
@@ -117,7 +124,7 @@ export default function NotebookDetailPage() {
           const response = await sourceApi.list(notebookId);
           setSources(response.sources);
         } catch (err: any) {
-          const errorMessage = err.response?.data?.detail || err.message || 'Failed to load sources';
+          const errorMessage = err.response?.data?.detail || err.message || tSources('loadFailed');
           setError(errorMessage);
           console.error('Failed to load sources:', err);
         } finally {
@@ -131,7 +138,7 @@ export default function NotebookDetailPage() {
           const response = await artifactApi.list(notebookId);
           setArtifacts(response.artifacts);
         } catch (err: any) {
-          const errorMessage = err.response?.data?.detail || err.message || 'Failed to load artifacts';
+          const errorMessage = err.response?.data?.detail || err.message || tArtifacts('loadFailed');
           setError(errorMessage);
           console.error('Failed to load artifacts:', err);
         } finally {
@@ -145,7 +152,7 @@ export default function NotebookDetailPage() {
           const response = await chatApi.getHistory(notebookId);
           setChatMessages(response.messages);
         } catch (err: any) {
-          const errorMessage = err.response?.data?.detail || err.message || 'Failed to load chat history';
+          const errorMessage = err.response?.data?.detail || err.message || tChat('loadFailed');
           setError(errorMessage);
           console.error('Failed to load chat history:', err);
         } finally {
@@ -172,7 +179,7 @@ export default function NotebookDetailPage() {
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <Loader2 className="inline-block h-8 w-8 animate-spin" />
-            <p className="mt-4 text-muted-foreground">Loading...</p>
+            <p className="mt-4 text-muted-foreground">{tCommon('loading')}</p>
           </div>
         </div>
       </>
@@ -192,9 +199,9 @@ export default function NotebookDetailPage() {
               className="mb-4"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Notebooks
+              {t('backToNotebooks')}
             </Button>
-            <h1 className="text-3xl font-bold text-foreground">Notebook: {notebookId}</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('notebookDetail', { id: notebookId })}</h1>
           </div>
 
           {error && (
@@ -210,7 +217,7 @@ export default function NotebookDetailPage() {
                   size="sm"
                   className="ml-4"
                 >
-                  Retry
+                  {tCommon('retry')}
                 </Button>
               </AlertDescription>
             </Alert>
@@ -226,9 +233,9 @@ export default function NotebookDetailPage() {
             }
           }}>
             <TabsList className="mb-6">
-              <TabsTrigger value="sources">Sources</TabsTrigger>
-              <TabsTrigger value="chat">Chat</TabsTrigger>
-              <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
+              <TabsTrigger value="sources">{tSources('title')}</TabsTrigger>
+              <TabsTrigger value="chat">{tChat('title')}</TabsTrigger>
+              <TabsTrigger value="artifacts">{tArtifacts('title')}</TabsTrigger>
             </TabsList>
 
             {/* Tab Content */}

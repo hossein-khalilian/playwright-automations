@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { artifactApi } from '@/lib/api-client';
 import type { ArtifactInfo } from '@/lib/types';
 import ArtifactCreateModal from './ArtifactCreateModal';
@@ -23,6 +24,8 @@ export default function ArtifactManager({
   onArtifactsChange,
   loading = false,
 }: ArtifactManagerProps) {
+  const t = useTranslations('artifacts');
+  const tCommon = useTranslations('common');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -31,7 +34,7 @@ export default function ArtifactManager({
   const [info, setInfo] = useState('');
 
   const handleDelete = async (artifactName: string) => {
-    if (!confirm(`Are you sure you want to delete "${artifactName}"?`)) {
+    if (!confirm(t('deleteConfirm', { name: artifactName }))) {
       return;
     }
 
@@ -40,11 +43,11 @@ export default function ArtifactManager({
       setError('');
       setInfo('');
       const status = await artifactApi.delete(notebookId, artifactName);
-      setInfo(status.message || 'Delete submitted.');
+      setInfo(status.message || t('deleteSubmitted'));
       await onArtifactsChange();
     } catch (err: any) {
       const errorMessage =
-        err.response?.data?.detail || err.message || 'Failed to delete artifact';
+        err.response?.data?.detail || err.message || t('deleteFailed');
       setError(errorMessage);
       console.error('Delete artifact error:', err);
     } finally {
@@ -58,10 +61,10 @@ export default function ArtifactManager({
       setError('');
       setInfo('');
       await artifactApi.download(notebookId, artifactName);
-      setInfo('Download completed successfully.');
+      setInfo(t('downloadCompleted'));
     } catch (err: any) {
       const errorMessage =
-        err.response?.data?.detail || err.message || 'Failed to download artifact';
+        err.response?.data?.detail || err.message || t('downloadFailed');
       setError(errorMessage);
       console.error('Download error:', err);
     } finally {
@@ -70,14 +73,14 @@ export default function ArtifactManager({
   };
 
   const artifactTypes = [
-    { id: 'audio-overview', label: 'Audio Overview' },
-    { id: 'video-overview', label: 'Video Overview' },
-    { id: 'flashcards', label: 'Flashcards' },
-    { id: 'quiz', label: 'Quiz' },
-    { id: 'infographic', label: 'Infographic' },
-    { id: 'slide-deck', label: 'Slide Deck' },
-    { id: 'report', label: 'Report' },
-    { id: 'mindmap', label: 'Mind Map' },
+    { id: 'audio-overview', label: t('audioOverview') },
+    { id: 'video-overview', label: t('videoOverview') },
+    { id: 'flashcards', label: t('flashcards') },
+    { id: 'quiz', label: t('quiz') },
+    { id: 'infographic', label: t('infographic') },
+    { id: 'slide-deck', label: t('slideDeck') },
+    { id: 'report', label: t('report') },
+    { id: 'mindmap', label: t('mindMap') },
   ];
 
   return (
@@ -96,7 +99,7 @@ export default function ArtifactManager({
       {/* Create Artifact Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Create Artifact</CardTitle>
+          <CardTitle>{t('createArtifact')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -117,12 +120,12 @@ export default function ArtifactManager({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Artifacts</CardTitle>
+            <CardTitle>{t('title')}</CardTitle>
             <div className="flex items-center space-x-2">
               {loading && (
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading...</span>
+                  <span>{tCommon('loading')}</span>
                 </div>
               )}
               <Button
@@ -130,10 +133,10 @@ export default function ArtifactManager({
                 disabled={loading}
                 variant="outline"
                 size="sm"
-                title="Reload artifacts"
+                title={t('reloadTitle')}
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
-                Reload
+                {t('reload')}
               </Button>
             </div>
           </div>
@@ -142,11 +145,11 @@ export default function ArtifactManager({
           {loading && artifacts.length === 0 ? (
             <div className="text-center py-8">
               <Loader2 className="inline-block h-8 w-8 animate-spin" />
-              <p className="mt-4 text-muted-foreground">Loading artifacts...</p>
+              <p className="mt-4 text-muted-foreground">{t('loadingArtifacts')}</p>
             </div>
           ) : artifacts.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              No artifacts created yet. Create an artifact to get started.
+              {t('noArtifacts')}
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -156,7 +159,7 @@ export default function ArtifactManager({
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
                         <h3 className="text-sm font-medium text-foreground">
-                          {artifact.name || `Artifact ${idx + 1}`}
+                          {artifact.name || t('artifactLabel', { index: idx + 1 })}
                         </h3>
                         {artifact.type && (
                           <span className="text-xs text-muted-foreground">({artifact.type})</span>
@@ -170,7 +173,7 @@ export default function ArtifactManager({
                               : 'outline'
                           }
                         >
-                          {artifact.is_generating ? 'Generating...' : artifact.status}
+                          {artifact.is_generating ? t('generating') : artifact.status}
                         </Badge>
                       </div>
                       {artifact.details && (
@@ -187,31 +190,31 @@ export default function ArtifactManager({
                           size="sm"
                           title={
                             artifact.type === 'mind_map'
-                              ? 'Download mindmap'
+                              ? t('downloadMindmap')
                               : artifact.type === 'video_overview'
-                              ? 'Download video'
+                              ? t('downloadVideo')
                               : artifact.type === 'audio_overview'
-                              ? 'Download audio'
+                              ? t('downloadAudio')
                               : artifact.type === 'infographic'
-                              ? 'Download infographic'
+                              ? t('downloadInfographic')
                               : artifact.type === 'flashcards'
-                              ? 'Download flashcards'
+                              ? t('downloadFlashcards')
                               : artifact.type === 'slide_deck'
-                              ? 'Download slide deck'
+                              ? t('downloadSlideDeck')
                               : artifact.type === 'reports'
-                              ? 'Download report'
-                              : 'Download artifact'
+                              ? t('downloadReport')
+                              : t('downloadArtifact')
                           }
                         >
                           {downloading === artifact.name ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Downloading...
+                              {t('downloading')}
                             </>
                           ) : (
                             <>
                               <Download className="h-4 w-4 mr-1" />
-                              Download
+                              {t('download')}
                             </>
                           )}
                         </Button>
@@ -221,7 +224,7 @@ export default function ArtifactManager({
                         disabled={deleting === artifact.name}
                         variant="destructive"
                         size="icon"
-                        title="Delete"
+                        title={tCommon('delete')}
                       >
                         {deleting === artifact.name ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
