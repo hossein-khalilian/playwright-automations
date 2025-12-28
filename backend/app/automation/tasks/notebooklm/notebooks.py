@@ -134,6 +134,70 @@ def get_notebook_titles(page: Page, notebook_ids: List[str]) -> Dict[str, Option
     return titles
 
 
+def rename_notebook(page: Page, notebook_id: str, new_title: str) -> Dict[str, str]:
+    """
+    Rename a NotebookLM notebook.
+
+    Args:
+        page: The Playwright Page object
+        notebook_id: The ID of the notebook to rename
+        new_title: The new title for the notebook
+
+    Returns:
+        Dictionary with status and message
+
+    Raises:
+        NotebookLMError: If notebook rename fails
+    """
+    try:
+        navigate_to_notebook(page, notebook_id)
+        close_dialogs(page)
+        page.wait_for_timeout(1_000)
+        
+        # Get the title textbox
+        title_locator = page.locator("editable-project-title").get_by_role("textbox")
+        title_locator.wait_for(timeout=10_000, state="visible")
+        
+        # Click multiple times to ensure focus (as shown in user's example)
+        title_locator.click()
+        page.wait_for_timeout(200)
+        title_locator.click()
+        page.wait_for_timeout(200)
+        title_locator.click()
+        page.wait_for_timeout(200)
+        
+        # Navigate to end of text and select all
+        # First, go to the end using ControlOrMeta+ArrowRight (or ArrowRight)
+        title_locator.press("ControlOrMeta+ArrowRight")
+        page.wait_for_timeout(100)
+        title_locator.press("ControlOrMeta+ArrowRight")
+        page.wait_for_timeout(100)
+        title_locator.press("ArrowRight")
+        page.wait_for_timeout(100)
+        
+        # Select all text
+        title_locator.press("ControlOrMeta+a")
+        page.wait_for_timeout(200)
+        
+        # Fill with new title
+        title_locator.fill(new_title)
+        page.wait_for_timeout(300)
+        
+        # Press Enter to save
+        title_locator.press("Enter")
+        page.wait_for_timeout(1_000)
+        
+        return {
+            "status": "success",
+            "message": f"Notebook {notebook_id} renamed to '{new_title}'.",
+            "new_title": new_title,
+        }
+    except NotebookLMError:
+        raise
+    except Exception as exc:
+        raise NotebookLMError(f"Failed to rename NotebookLM notebook: {exc}") from exc
+
+
 def delete_notebook(page: Page, notebook_id: str) -> Dict[str, str]:
     """
     Delete a NotebookLM notebook.

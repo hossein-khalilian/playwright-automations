@@ -11,7 +11,8 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, FolderOpen } from 'lucide-react';
+import { Loader2, Plus, Trash2, FolderOpen, Pencil, Check, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 export default function NotebooksPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -24,6 +25,9 @@ export default function NotebooksPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
@@ -63,6 +67,38 @@ export default function NotebooksPage() {
       setError(message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleStartEdit = (notebook: Notebook) => {
+    setEditingId(notebook.notebook_id);
+    setEditingTitle(notebook.title || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  const handleSaveRename = async (notebookId: string) => {
+    if (!editingTitle.trim()) {
+      return;
+    }
+
+    try {
+      setRenamingId(notebookId);
+      setError('');
+      setInfo('');
+      const status = await notebookApi.rename(notebookId, editingTitle.trim());
+      setInfo(status.message || t('renameSubmitted'));
+      setEditingId(null);
+      setEditingTitle('');
+      setRenamingId(null);
+      await loadNotebooks();
+    } catch (err: any) {
+      const message = err.response?.data?.detail || err.message || t('renameFailed');
+      setError(message);
+      setRenamingId(null);
     }
   };
 
@@ -147,9 +183,49 @@ export default function NotebooksPage() {
               {notebooks.map((notebook) => (
                 <Card key={notebook.notebook_id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
-                    <CardTitle className="text-lg">
-                      {notebook.title || t('untitledNotebook')}
-                    </CardTitle>
+                    {editingId === notebook.notebook_id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveRename(notebook.notebook_id);
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit();
+                            }
+                          }}
+                          className="flex-1"
+                          autoFocus
+                        />
+                        <Button
+                          onClick={() => handleSaveRename(notebook.notebook_id)}
+                          disabled={!editingTitle.trim() || renamingId === notebook.notebook_id}
+                          size="icon"
+                          variant="default"
+                          title={t('saveRename')}
+                        >
+                          {renamingId === notebook.notebook_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          onClick={handleCancelEdit}
+                          disabled={renamingId === notebook.notebook_id}
+                          size="icon"
+                          variant="outline"
+                          title={tCommon('cancel')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <CardTitle className="text-lg line-clamp-2 min-h-[3rem] break-words">
+                        {notebook.title || t('untitledNotebook')}
+                      </CardTitle>
+                    )}
                     <CardDescription>
                       {t('created')}: {format(new Date(notebook.created_at), 'PPp')}
                     </CardDescription>
@@ -158,23 +234,37 @@ export default function NotebooksPage() {
                     <Button
                       onClick={() => router.push(`/notebooks/${notebook.notebook_id}`)}
                       className="flex-1"
+                      disabled={editingId === notebook.notebook_id}
                     >
                       <FolderOpen className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       {tCommon('open')}
                     </Button>
-                    <Button
-                      onClick={() => handleDelete(notebook.notebook_id)}
-                      disabled={deletingId === notebook.notebook_id}
-                      variant="destructive"
-                      size="icon"
-                      title={tCommon('delete')}
-                    >
-                      {deletingId === notebook.notebook_id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    {editingId !== notebook.notebook_id && (
+                      <>
+                        <Button
+                          onClick={() => handleStartEdit(notebook)}
+                          disabled={renamingId === notebook.notebook_id || deletingId === notebook.notebook_id}
+                          variant="outline"
+                          size="icon"
+                          title={tCommon('edit')}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleDelete(notebook.notebook_id)}
+                          disabled={deletingId === notebook.notebook_id || renamingId === notebook.notebook_id}
+                          variant="destructive"
+                          size="icon"
+                          title={tCommon('delete')}
+                        >
+                          {deletingId === notebook.notebook_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
+                    )}
                   </CardFooter>
                 </Card>
               ))}

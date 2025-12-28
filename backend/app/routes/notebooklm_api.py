@@ -33,6 +33,7 @@ from app.celery_tasks.notebooklm import (
     list_sources_task,
     query_notebook_task,
     rename_artifact_task,
+    rename_notebook_task,
     rename_source_task,
     review_source_task,
     update_notebook_titles_task,
@@ -46,6 +47,7 @@ from app.models import (
     Notebook,
     NotebookListResponse,
     NotebookQueryRequest,
+    NotebookRenameRequest,
     QuizCreateRequest,
     ReportCreateRequest,
     SlideDeckCreateRequest,
@@ -185,6 +187,28 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
 )
 def create_notebook_endpoint(current_user: CurrentUser) -> TaskSubmissionResponse:
     return _submit(create_notebook_task, current_user.username, _headless(), _profile())
+
+
+@router.post(
+    "/notebooks/{notebook_id}/rename",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Notebooks"],
+)
+def rename_notebook_endpoint(
+    notebook_id: str,
+    payload: NotebookRenameRequest,
+    current_user: CurrentUser,
+) -> TaskSubmissionResponse:
+    """Rename a notebook."""
+    return _submit(
+        rename_notebook_task,
+        current_user.username,
+        notebook_id,
+        payload.new_title,
+        _headless(),
+        _profile(),
+    )
 
 
 @router.delete(

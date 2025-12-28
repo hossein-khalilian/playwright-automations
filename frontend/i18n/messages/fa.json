@@ -65,7 +65,11 @@
     "loadFailed": "بارگذاری دفترچه‌ها ناموفق بود",
     "createFailed": "ایجاد دفترچه ناموفق بود",
     "deleteFailed": "حذف دفترچه ناموفق بود",
-    "untitledNotebook": "دفترچه بدون عنوان"
+    "untitledNotebook": "دفترچه بدون عنوان",
+    "renameSubmitted": "درخواست تغییر نام دفترچه ارسال شد.",
+    "renameFailed": "تغییر نام دفترچه ناموفق بود",
+    "renaming": "در حال تغییر نام...",
+    "saveRename": "ذخیره تغییر نام"
   },
   "sources": {
     "title": "منابع",

@@ -27,6 +27,7 @@ from app.automation.tasks.notebooklm.notebooks import (
     delete_notebook,
     get_notebook_title,
     get_notebook_titles,
+    rename_notebook,
 )
 from app.automation.tasks.notebooklm.quiz import create_quiz
 from app.automation.tasks.notebooklm.report import create_report
@@ -154,6 +155,31 @@ def create_notebook_task(username: str, headless: bool, profile: str) -> Dict[st
             except Exception as exc:
                 logger.error(f"Error saving notebook {notebook_id} to MongoDB: {exc}", exc_info=True)
     
+    return result
+
+
+@celery_app.task(name="notebooklm.rename_notebook")
+def rename_notebook_task(
+    username: str, notebook_id: str, new_title: str, headless: bool, profile: str
+) -> Dict[str, Any]:
+    """Rename a NotebookLM notebook and update its DB record."""
+    result = _run_with_browser(rename_notebook, headless, profile, notebook_id, new_title)
+
+    if result.get("status") == "success":
+        try:
+            updated = update_notebook_title_sync(username, notebook_id, new_title)
+            if updated:
+                logger.info(f"Notebook {notebook_id} renamed to '{new_title}' in MongoDB for user {username}")
+            else:
+                logger.warning(
+                    f"Notebook {notebook_id} rename succeeded in UI but failed to update MongoDB for user {username}"
+                )
+        except Exception as exc:
+            logger.error(
+                f"Error updating notebook {notebook_id} title in MongoDB for user {username}: {exc}",
+                exc_info=True,
+            )
+
     return result
 
 

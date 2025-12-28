@@ -53,6 +53,16 @@ export interface NotebookCreateResponse {
   notebook_id?: string;
 }
 
+export interface NotebookRenameRequest {
+  new_title: string;
+}
+
+export interface NotebookRenameResponse {
+  status: string;
+  message: string;
+  new_title?: string;
+}
+
 // Source types
 export interface Source {
   name: string;

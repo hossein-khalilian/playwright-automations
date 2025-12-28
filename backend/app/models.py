@@ -80,6 +80,16 @@ class NotebookListResponse(BaseModel):
     )
 
 
+class NotebookRenameRequest(BaseModel):
+    new_title: str = Field(description="The new title for the notebook")
+
+
+class NotebookRenameResponse(BaseModel):
+    status: str = Field(description="Status of the rename operation")
+    message: str = Field(description="Message describing the result")
+    new_title: Optional[str] = Field(None, description="The new title of the notebook")
+
+
 class SourceUploadResponse(BaseModel):
     status: str = Field(description="Status of the source upload")
     message: str = Field(description="Message describing the result")

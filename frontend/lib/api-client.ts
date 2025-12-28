@@ -20,6 +20,8 @@ import type {
   NotebookListResponse,
   NotebookQueryRequest,
   NotebookQueryResponse,
+  NotebookRenameRequest,
+  NotebookRenameResponse,
   QuizCreateRequest,
   RegisterRequest,
   RegisterResponse,
@@ -149,6 +151,22 @@ export const notebookApi = {
           .then((res) => res.data),
       undefined,
       { label: 'Create notebook', type: 'notebook.create' }
+    );
+  },
+
+  rename: async (
+    notebookId: string,
+    newTitle: string
+  ): Promise<TaskStatusResponse<NotebookRenameResponse>> => {
+    return submitTask<NotebookRenameResponse>(
+      () =>
+        api
+          .post<TaskSubmissionResponse>(`/notebooklm/notebooks/${notebookId}/rename`, {
+            new_title: newTitle,
+          } as NotebookRenameRequest)
+          .then((res) => res.data),
+      undefined,
+      { label: 'Rename notebook', type: 'notebook.rename', notebookId }
     );
   },
 

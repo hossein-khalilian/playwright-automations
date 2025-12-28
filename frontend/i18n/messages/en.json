@@ -65,7 +65,11 @@
     "loadFailed": "Failed to load notebooks",
     "createFailed": "Failed to create notebook",
     "deleteFailed": "Failed to delete notebook",
-    "untitledNotebook": "Untitled Notebook"
+    "untitledNotebook": "Untitled Notebook",
+    "renameSubmitted": "Notebook rename submitted.",
+    "renameFailed": "Failed to rename notebook",
+    "renaming": "Renaming...",
+    "saveRename": "Save rename"
   },
   "sources": {
     "title": "Sources",
