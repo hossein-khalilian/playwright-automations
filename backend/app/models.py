@@ -71,6 +71,7 @@ class Notebook(BaseModel):
     notebook_url: str = Field(description="URL of the notebook page")
     created_at: datetime = Field(description="Timestamp when the notebook was created")
     email: Optional[str] = Field(None, description="Email address used to create the notebook")
+    title: Optional[str] = Field(None, description="Title of the notebook")
 
 
 class NotebookListResponse(BaseModel):

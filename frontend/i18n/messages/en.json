@@ -64,7 +64,8 @@
     "createSubmitted": "Notebook creation submitted.",
     "loadFailed": "Failed to load notebooks",
     "createFailed": "Failed to create notebook",
-    "deleteFailed": "Failed to delete notebook"
+    "deleteFailed": "Failed to delete notebook",
+    "untitledNotebook": "Untitled Notebook"
   },
   "sources": {
     "title": "Sources",

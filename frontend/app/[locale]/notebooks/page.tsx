@@ -147,7 +147,9 @@ export default function NotebooksPage() {
               {notebooks.map((notebook) => (
                 <Card key={notebook.notebook_id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
-                    <CardTitle className="text-lg">{notebook.notebook_id}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {notebook.title || t('untitledNotebook')}
+                    </CardTitle>
                     <CardDescription>
                       {t('created')}: {format(new Date(notebook.created_at), 'PPp')}
                     </CardDescription>

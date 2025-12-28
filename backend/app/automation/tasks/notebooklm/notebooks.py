@@ -1,6 +1,6 @@
 """Sync notebook operations for NotebookLM automation."""
 
-from typing import Dict
+from typing import Dict, List, Optional
 
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -10,6 +10,7 @@ from app.automation.tasks.notebooklm.helpers import (
     close_dialogs,
     extract_notebook_id_from_url,
     navigate_to_main_page,
+    navigate_to_notebook,
 )
 
 
@@ -55,6 +56,82 @@ def create_notebook(page: Page, email: str = None) -> Dict[str, str]:
         raise
     except Exception as exc:
         raise NotebookLMError(f"Failed to create NotebookLM notebook: {exc}") from exc
+
+
+def get_notebook_title(page: Page, notebook_id: str) -> Optional[str]:
+    """
+    Get the title of a NotebookLM notebook.
+
+    Args:
+        page: The Playwright Page object
+        notebook_id: The ID of the notebook
+
+    Returns:
+        The notebook title, or None if not found
+
+    Raises:
+        NotebookLMError: If title extraction fails
+    """
+    try:
+        navigate_to_notebook(page, notebook_id)
+        close_dialogs(page)
+        page.wait_for_timeout(1_000)
+        
+        # Get title from editable-project-title element
+        title_locator = page.locator("editable-project-title").get_by_role("textbox")
+        title_locator.wait_for(timeout=10_000, state="visible")
+        
+        # Try to get the value - use input_value() first, then fallback to text_content()
+        try:
+            title = title_locator.input_value()
+        except Exception:
+            # If input_value() fails, try text_content()
+            title = title_locator.text_content()
+        
+        # If still empty, try inner_text as a last resort
+        if not title or not title.strip():
+            try:
+                title = title_locator.inner_text()
+            except Exception:
+                pass
+        
+        return title.strip() if title else None
+    except NotebookLMError:
+        raise
+    except Exception as exc:
+        raise NotebookLMError(f"Failed to get notebook title: {exc}") from exc
+
+
+def get_notebook_titles(page: Page, notebook_ids: List[str]) -> Dict[str, Optional[str]]:
+    """
+    Get titles for multiple notebooks.
+
+    Args:
+        page: The Playwright Page object
+        notebook_ids: List of notebook IDs to get titles for
+
+    Returns:
+        Dictionary mapping notebook_id to title (or None if not found)
+
+    Raises:
+        NotebookLMError: If title extraction fails
+    """
+    titles = {}
+    try:
+        for notebook_id in notebook_ids:
+            try:
+                title = get_notebook_title(page, notebook_id)
+                titles[notebook_id] = title
+            except Exception as exc:
+                # If we can't get title for one notebook, continue with others
+                titles[notebook_id] = None
+                continue
+    except NotebookLMError:
+        raise
+    except Exception as exc:
+        raise NotebookLMError(f"Failed to get notebook titles: {exc}") from exc
+    
+    return titles
 
 
 def delete_notebook(page: Page, notebook_id: str) -> Dict[str, str]:

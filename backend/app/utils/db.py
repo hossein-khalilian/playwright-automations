@@ -205,6 +205,116 @@ async def delete_notebook_from_db(username: str, notebook_id: str) -> bool:
         return False
 
 
+async def update_notebook_title(username: str, notebook_id: str, title: Optional[str]) -> bool:
+    """
+    Update the title of a notebook in the database.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_notebooks_collection()
+    if collection is None:
+        return False
+
+    try:
+        result = await collection.update_one(
+            {"username": username, "notebook_id": notebook_id},
+            {"$set": {"title": title}}
+        )
+        return True
+    except Exception:
+        return False
+
+
+async def update_notebook_titles(username: str, titles: dict) -> bool:
+    """
+    Update titles for multiple notebooks.
+    
+    Args:
+        username: The username
+        titles: Dictionary mapping notebook_id to title (or None)
+    
+    Returns:
+        True if successful, False if database error
+    """
+    collection = await get_notebooks_collection()
+    if collection is None:
+        return False
+
+    try:
+        for notebook_id, title in titles.items():
+            await collection.update_one(
+                {"username": username, "notebook_id": notebook_id},
+                {"$set": {"title": title}}
+            )
+        return True
+    except Exception:
+        return False
+
+
+def update_notebook_title_sync(username: str, notebook_id: str, title: Optional[str]) -> bool:
+    """
+    Update the title of a notebook in the database (sync version for Celery tasks).
+    Returns True if successful, False if database error.
+    """
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return False
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["notebooks"]
+        
+        collection.update_one(
+            {"username": username, "notebook_id": notebook_id},
+            {"$set": {"title": title}}
+        )
+        return True
+    except Exception:
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def update_notebook_titles_sync(username: str, titles: dict) -> bool:
+    """
+    Update titles for multiple notebooks (sync version for Celery tasks).
+    
+    Args:
+        username: The username
+        titles: Dictionary mapping notebook_id to title (or None)
+    
+    Returns:
+        True if successful, False if database error
+    """
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return False
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["notebooks"]
+        
+        for notebook_id, title in titles.items():
+            collection.update_one(
+                {"username": username, "notebook_id": notebook_id},
+                {"$set": {"title": title}}
+            )
+        return True
+    except Exception:
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
 async def close_db_client():
     """Close the MongoDB client connection. Call this on app shutdown."""
     global _db_client

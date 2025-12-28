@@ -2,6 +2,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
+from typing import Optional
 from urllib.parse import quote
 
 from celery.result import AsyncResult
@@ -34,6 +35,7 @@ from app.celery_tasks.notebooklm import (
     rename_artifact_task,
     rename_source_task,
     review_source_task,
+    update_notebook_titles_task,
 )
 from app.models import (
     ArtifactRenameRequest,
@@ -107,6 +109,31 @@ def _task_status(task_id: str) -> TaskStatusResponse:
 # ============================================================================
 
 
+def _is_untitled_title(title: Optional[str]) -> bool:
+    """
+    Check if a title is considered "untitled" and should be refreshed.
+    
+    Args:
+        title: The title to check
+        
+    Returns:
+        True if the title is considered untitled
+    """
+    if not title:
+        return True
+    
+    title_lower = title.strip().lower()
+    # Common variations of "untitled notebook"
+    untitled_patterns = [
+        "untitled notebook",
+        "untitled",
+        "بدون عنوان",  # Persian: "without title"
+        "دفترچه بدون عنوان",  # Persian: "notebook without title"
+    ]
+    
+    return title_lower in [p.lower() for p in untitled_patterns]
+
+
 @router.get(
     "/notebooks",
     response_model=NotebookListResponse,
@@ -117,14 +144,33 @@ async def list_notebooks_endpoint(current_user: CurrentUser) -> NotebookListResp
     """
     List all notebooks for the current user.
     Returns notebooks directly from MongoDB without using Celery.
+    If notebooks don't have titles or have "Untitled notebook", triggers a background task to fetch them.
     """
     notebooks_data = await get_notebooks_by_user(current_user.username)
+    
+    # Check which notebooks need titles (no title or "Untitled notebook")
+    notebooks_without_titles = [
+        doc["notebook_id"]
+        for doc in notebooks_data
+        if _is_untitled_title(doc.get("title"))
+    ]
+    
+    # Trigger background task to fetch titles if needed
+    if notebooks_without_titles:
+        update_notebook_titles_task.delay(
+            current_user.username,
+            notebooks_without_titles,
+            _headless(),
+            _profile(),
+        )
+    
     notebooks = [
         Notebook(
             notebook_id=doc["notebook_id"],
             notebook_url=doc["notebook_url"],
             created_at=doc["created_at"],
             email=doc.get("email"),
+            title=doc.get("title"),
         )
         for doc in notebooks_data
     ]
@@ -196,7 +242,8 @@ def upload_source_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to store upload: {exc}",
         )
-    return _submit(add_source_task, notebook_id, tmp_path, _headless(), _profile())
+    username = current_user.username if current_user else None
+    return _submit(add_source_task, notebook_id, tmp_path, _headless(), _profile(), username)
 
 
 @router.post(
@@ -212,7 +259,7 @@ def add_url_source_endpoint(
 ) -> TaskSubmissionResponse:
     """Add URL sources to a notebook."""
     return _submit(
-        add_url_source_task, notebook_id, payload.urls, _headless(), _profile()
+        add_url_source_task, notebook_id, payload.urls, _headless(), _profile(), current_user.username
     )
 
 

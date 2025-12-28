@@ -64,7 +64,8 @@
     "createSubmitted": "درخواست ایجاد دفترچه ارسال شد.",
     "loadFailed": "بارگذاری دفترچه‌ها ناموفق بود",
     "createFailed": "ایجاد دفترچه ناموفق بود",
-    "deleteFailed": "حذف دفترچه ناموفق بود"
+    "deleteFailed": "حذف دفترچه ناموفق بود",
+    "untitledNotebook": "دفترچه بدون عنوان"
   },
   "sources": {
     "title": "منابع",

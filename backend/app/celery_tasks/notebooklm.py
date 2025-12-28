@@ -22,7 +22,12 @@ from app.automation.tasks.notebooklm.exceptions import NotebookLMError
 from app.automation.tasks.notebooklm.flashcards import create_flashcards
 from app.automation.tasks.notebooklm.infographic import create_infographic
 from app.automation.tasks.notebooklm.mindmap import create_mindmap
-from app.automation.tasks.notebooklm.notebooks import create_notebook, delete_notebook
+from app.automation.tasks.notebooklm.notebooks import (
+    create_notebook,
+    delete_notebook,
+    get_notebook_title,
+    get_notebook_titles,
+)
 from app.automation.tasks.notebooklm.quiz import create_quiz
 from app.automation.tasks.notebooklm.report import create_report
 from app.automation.tasks.notebooklm.slide_deck import create_slide_deck
@@ -39,7 +44,12 @@ from app.celery_app import celery_app
 from app.utils.browser_state import get_page_from_pool, return_page_to_pool
 from app.utils.browser_utils import initialize_page_sync
 from app.utils.config import config
-from app.utils.db import delete_notebook_sync, save_notebook_sync
+from app.utils.db import (
+    delete_notebook_sync,
+    save_notebook_sync,
+    update_notebook_titles_sync,
+    update_notebook_title_sync,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +182,52 @@ def delete_notebook_task(
     return result
 
 
+@celery_app.task(name="notebooklm.update_notebook_titles")
+def update_notebook_titles_task(
+    username: str, notebook_ids: list, headless: bool, profile: str
+) -> Dict[str, Any]:
+    """Fetch and update titles for notebooks that don't have them."""
+    try:
+        def fetch_titles(page):
+            return get_notebook_titles(page, notebook_ids)
+        
+        result = _run_with_browser(fetch_titles, headless, profile)
+        
+        if isinstance(result, dict) and "status" not in result:
+            # Result is the titles dictionary
+            titles = result
+            try:
+                updated = update_notebook_titles_sync(username, titles)
+                if updated:
+                    logger.info(f"Updated titles for {len(titles)} notebooks for user {username}")
+                    return {
+                        "status": "success",
+                        "message": f"Updated titles for {len(titles)} notebooks",
+                        "titles": titles,
+                    }
+                else:
+                    logger.warning(f"Failed to update titles in database for user {username}")
+                    return {
+                        "status": "error",
+                        "message": "Failed to update titles in database",
+                    }
+            except Exception as exc:
+                logger.error(f"Error updating titles in database: {exc}", exc_info=True)
+                return {
+                    "status": "error",
+                    "message": f"Error updating titles: {exc}",
+                }
+        else:
+            # Result is an error dictionary
+            return result
+    except Exception as exc:
+        logger.error(f"Error in update_notebook_titles_task: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {exc}",
+        }
+
+
 # ============================================================================
 # Source tasks
 # ============================================================================
@@ -179,22 +235,62 @@ def delete_notebook_task(
 
 @celery_app.task(name="notebooklm.add_source")
 def add_source_task(
-    notebook_id: str, file_path: str, headless: bool, profile: str
+    notebook_id: str, file_path: str, headless: bool, profile: str, username: str = None
 ) -> Dict[str, Any]:
     """Add a source file to a notebook."""
-    return _run_with_browser(
+    result = _run_with_browser(
         add_source_to_notebook, headless, profile, notebook_id, file_path
     )
+    
+    # If source upload was successful, update the notebook title
+    # (titles often change from "Untitled notebook" after adding sources)
+    if result.get("status") == "success" and username:
+        try:
+            def fetch_title(page):
+                title = get_notebook_title(page, notebook_id)
+                return {"status": "success", "title": title} if title else {"status": "error", "message": "No title found"}
+            
+            title_result = _run_with_browser(fetch_title, headless, profile)
+            if isinstance(title_result, dict) and title_result.get("status") == "success":
+                title = title_result.get("title")
+                if title and title.strip():
+                    update_notebook_title_sync(username, notebook_id, title)
+                    logger.info(f"Updated title for notebook {notebook_id} after source upload: {title}")
+        except Exception as exc:
+            # Don't fail the source upload if title update fails
+            logger.warning(f"Failed to update title after source upload: {exc}")
+    
+    return result
 
 
 @celery_app.task(name="notebooklm.add_url_source")
 def add_url_source_task(
-    notebook_id: str, urls: str, headless: bool, profile: str
+    notebook_id: str, urls: str, headless: bool, profile: str, username: str = None
 ) -> Dict[str, Any]:
     """Add URL sources to a notebook."""
-    return _run_with_browser(
+    result = _run_with_browser(
         add_url_source_to_notebook, headless, profile, notebook_id, urls
     )
+    
+    # If source upload was successful, update the notebook title
+    # (titles often change from "Untitled notebook" after adding sources)
+    if result.get("status") == "success" and username:
+        try:
+            def fetch_title(page):
+                title = get_notebook_title(page, notebook_id)
+                return {"status": "success", "title": title} if title else {"status": "error", "message": "No title found"}
+            
+            title_result = _run_with_browser(fetch_title, headless, profile)
+            if isinstance(title_result, dict) and title_result.get("status") == "success":
+                title = title_result.get("title")
+                if title and title.strip():
+                    update_notebook_title_sync(username, notebook_id, title)
+                    logger.info(f"Updated title for notebook {notebook_id} after URL source upload: {title}")
+        except Exception as exc:
+            # Don't fail the source upload if title update fails
+            logger.warning(f"Failed to update title after URL source upload: {exc}")
+    
+    return result
 
 
 @celery_app.task(name="notebooklm.list_sources")

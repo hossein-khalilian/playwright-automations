@@ -39,6 +39,7 @@ export interface Notebook {
   notebook_url: string;
   created_at: string;
   email?: string;
+  title?: string;
 }
 
 export interface NotebookListResponse {

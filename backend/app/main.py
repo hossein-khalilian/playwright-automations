@@ -1,10 +1,11 @@
 import logging
 import sys
 
-from app.routes.auth_api import router as auth_router
-from app.routes.notebooklm_api import router as notebooklm_router
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.routes.auth_api import router as auth_router
+from app.routes.notebooklm_api import router as notebooklm_router
 
 logging.basicConfig(
     level=logging.INFO,
