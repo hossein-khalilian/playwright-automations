@@ -135,8 +135,8 @@ export const authApi = {
     return response.data;
   },
 
-  adminTest: async (): Promise<{ message: string; username: string; role: string }> => {
-    const response = await api.get<{ message: string; username: string; role: string }>('/auth/admin/test');
+  adminTest: async (): Promise<{ message: string; username: string; roles: string[] }> => {
+    const response = await api.get<{ message: string; username: string; roles: string[] }>('/auth/admin/test');
     return response.data;
   },
 };

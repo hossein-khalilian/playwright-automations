@@ -34,7 +34,7 @@ async def login(request: LoginRequest) -> Token:
 
     access_token_expires = timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role},
+        data={"sub": user.username, "roles": user.roles},
         expires_delta=access_token_expires,
     )
     return Token(access_token=access_token, token_type="bearer")
@@ -118,5 +118,5 @@ async def admin_test(current_admin: CurrentAdmin) -> dict:
     return {
         "message": "Admin access granted",
         "username": current_admin.username,
-        "role": current_admin.role,
+        "roles": current_admin.roles,
     }

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.admin_api import router as admin_router
 from app.routes.auth_api import router as auth_router
 from app.routes.notebooklm_api import router as notebooklm_router
+from app.utils.db import initialize_default_roles_and_permissions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +40,17 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize default roles and permissions on application startup."""
+    logger.info("Initializing default roles and permissions...")
+    success = await initialize_default_roles_and_permissions()
+    if success:
+        logger.info("Default roles and permissions initialized successfully")
+    else:
+        logger.warning("Failed to initialize default roles and permissions")
 
 
 @app.get("/health")

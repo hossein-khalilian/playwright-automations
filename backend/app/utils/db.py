@@ -43,6 +43,26 @@ async def get_users_collection():
     return db["users"]
 
 
+async def get_roles_collection():
+    """Get the roles collection from MongoDB."""
+    client = await get_db_client()
+    if client is None:
+        return None
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    db = client[db_name]
+    return db["roles"]
+
+
+async def get_permissions_collection():
+    """Get the permissions collection from MongoDB."""
+    client = await get_db_client()
+    if client is None:
+        return None
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    db = client[db_name]
+    return db["permissions"]
+
+
 async def get_notebooks_collection():
     """Get the notebooks collection from MongoDB."""
     client = await get_db_client()
@@ -53,7 +73,7 @@ async def get_notebooks_collection():
     return db["notebooks"]
 
 
-async def create_user(username: str, hashed_password: str, role: str = "user") -> bool:
+async def create_user(username: str, hashed_password: str, roles: List[str] = None) -> bool:
     """
     Create a new user in the database.
     Returns True if successful, False if user already exists or database error.
@@ -66,10 +86,14 @@ async def create_user(username: str, hashed_password: str, role: str = "user") -
         # Create unique index on username if it doesn't exist
         await collection.create_index("username", unique=True)
 
+        # Default to ["user"] if no roles provided
+        if roles is None:
+            roles = ["user"]
+
         user_doc = {
             "username": username,
             "hashed_password": hashed_password,
-            "role": role,
+            "roles": roles,
             "created_at": datetime.now(timezone.utc),
             "is_active": True,
         }
@@ -451,3 +475,238 @@ async def close_db_client():
     if _db_client is not None:
         await _db_client.close()
         _db_client = None
+
+
+# Role and Permission Management Functions
+
+async def create_role(role_name: str, description: str = "", permissions: List[str] = None) -> bool:
+    """
+    Create a new role in the database.
+    Returns True if successful, False if role already exists or database error.
+    """
+    collection = await get_roles_collection()
+    if collection is None:
+        return False
+
+    try:
+        # Create unique index on role_name if it doesn't exist
+        await collection.create_index("role_name", unique=True)
+
+        role_doc = {
+            "role_name": role_name,
+            "description": description,
+            "permissions": permissions or [],
+            "created_at": datetime.now(timezone.utc),
+        }
+        await collection.insert_one(role_doc)
+        return True
+    except DuplicateKeyError:
+        return False
+    except Exception:
+        return False
+
+
+async def get_role_by_name(role_name: str) -> Optional[dict]:
+    """Get role document by role name."""
+    collection = await get_roles_collection()
+    if collection is None:
+        return None
+
+    try:
+        role = await collection.find_one({"role_name": role_name})
+        return role
+    except Exception:
+        return None
+
+
+async def get_all_roles() -> List[dict]:
+    """Get all roles from the database."""
+    collection = await get_roles_collection()
+    if collection is None:
+        return []
+
+    try:
+        cursor = collection.find({}).sort("role_name", 1)
+        roles = await cursor.to_list(length=None)
+        return roles
+    except Exception:
+        return []
+
+
+async def update_role_permissions(role_name: str, permissions: List[str]) -> bool:
+    """
+    Update permissions for a role.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_roles_collection()
+    if collection is None:
+        return False
+
+    try:
+        result = await collection.update_one(
+            {"role_name": role_name},
+            {"$set": {"permissions": permissions}}
+        )
+        return result.modified_count > 0 or result.matched_count > 0
+    except Exception:
+        return False
+
+
+async def get_user_roles(username: str) -> List[str]:
+    """
+    Get all roles for a user.
+    Returns list of role names, or empty list if error.
+    """
+    user_doc = await get_user_by_username(username)
+    if not user_doc:
+        return []
+    
+    # Support both old format (single role) and new format (roles list)
+    if "roles" in user_doc:
+        return user_doc.get("roles", [])
+    elif "role" in user_doc:
+        # Migration: convert old single role to list
+        return [user_doc.get("role", "user")]
+    else:
+        return ["user"]
+
+
+async def get_user_permissions(username: str) -> List[str]:
+    """
+    Get all permissions for a user based on their roles.
+    Returns list of unique permission names.
+    """
+    roles = await get_user_roles(username)
+    if not roles:
+        return []
+    
+    collection = await get_roles_collection()
+    if collection is None:
+        return []
+    
+    try:
+        # Get all roles and collect their permissions
+        all_permissions = set()
+        for role_name in roles:
+            role = await get_role_by_name(role_name)
+            if role:
+                role_permissions = role.get("permissions", [])
+                all_permissions.update(role_permissions)
+        
+        return list(all_permissions)
+    except Exception:
+        return []
+
+
+async def user_has_permission(username: str, permission: str) -> bool:
+    """
+    Check if a user has a specific permission.
+    Returns True if user has the permission, False otherwise.
+    """
+    permissions = await get_user_permissions(username)
+    return permission in permissions
+
+
+async def user_has_role(username: str, role_name: str) -> bool:
+    """
+    Check if a user has a specific role.
+    Returns True if user has the role, False otherwise.
+    """
+    roles = await get_user_roles(username)
+    return role_name in roles
+
+
+async def add_role_to_user(username: str, role_name: str) -> bool:
+    """
+    Add a role to a user.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_users_collection()
+    if collection is None:
+        return False
+
+    try:
+        # Get current roles
+        roles = await get_user_roles(username)
+        
+        # Add role if not already present
+        if role_name not in roles:
+            roles.append(role_name)
+            result = await collection.update_one(
+                {"username": username},
+                {"$set": {"roles": roles}}
+            )
+            return result.modified_count > 0 or result.matched_count > 0
+        return True  # Role already exists
+    except Exception:
+        return False
+
+
+async def remove_role_from_user(username: str, role_name: str) -> bool:
+    """
+    Remove a role from a user.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_users_collection()
+    if collection is None:
+        return False
+
+    try:
+        # Get current roles
+        roles = await get_user_roles(username)
+        
+        # Remove role if present
+        if role_name in roles:
+            roles.remove(role_name)
+            # Ensure user has at least one role
+            if not roles:
+                roles = ["user"]
+            
+            result = await collection.update_one(
+                {"username": username},
+                {"$set": {"roles": roles}}
+            )
+            return result.modified_count > 0 or result.matched_count > 0
+        return True  # Role didn't exist
+    except Exception:
+        return False
+
+
+async def initialize_default_roles_and_permissions() -> bool:
+    """
+    Initialize default roles and permissions in the database.
+    This should be called on application startup.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        # Define admin permissions
+        admin_permissions = [
+            "manage_google_credentials",
+            "manage_users",
+            "access_admin_panel",
+            "view_all_notebooks",
+            "manage_roles",
+            "manage_permissions",
+        ]
+        
+        # Create admin role if it doesn't exist
+        admin_role = await get_role_by_name("admin")
+        if not admin_role:
+            await create_role(
+                role_name="admin",
+                description="Administrator with full system access",
+                permissions=admin_permissions
+            )
+        
+        # Create user role if it doesn't exist
+        user_role = await get_role_by_name("user")
+        if not user_role:
+            await create_role(
+                role_name="user",
+                description="Standard user with basic access",
+                permissions=["access_notebooks", "create_notebooks"]
+            )
+        
+        return True
+    except Exception:
+        return False

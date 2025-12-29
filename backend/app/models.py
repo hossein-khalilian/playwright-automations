@@ -45,12 +45,12 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
-    role: Optional[str] = None
+    roles: Optional[List[str]] = None
 
 
 class User(BaseModel):
     username: str
-    role: str = "user"
+    roles: List[str] = Field(default_factory=lambda: ["user"])
 
 
 class LoginRequest(BaseModel):

@@ -5,7 +5,8 @@ import { authApi } from '@/lib/api-client';
 
 interface AuthContextType {
   user: string | null;
-  role: string | null;
+  role: string | null; // Primary role (first role or 'user' if none)
+  roles: string[]; // All roles
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
@@ -18,7 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Helper function to decode JWT token
-function decodeJWT(token: string): { username?: string; role?: string } | null {
+function decodeJWT(token: string): { username?: string; role?: string; roles?: string[] } | null {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -37,6 +38,7 @@ function decodeJWT(token: string): { username?: string; role?: string } | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,10 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
         setToken(storedToken);
-        // Decode token to get role
+        // Decode token to get roles
         const decoded = decodeJWT(storedToken);
         if (decoded) {
-          setRole(decoded.role || 'user');
+          // Support both new format (roles array) and old format (single role)
+          const userRoles = decoded.roles || (decoded.role ? [decoded.role] : ['user']);
+          setRoles(userRoles);
+          setRole(userRoles[0] || 'user');
         }
         // Verify token by fetching user info
         authApi
@@ -62,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem('token');
             setToken(null);
             setRole(null);
+            setRoles([]);
           })
           .finally(() => {
             setLoading(false);
@@ -78,10 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', accessToken);
     setToken(accessToken);
     setUser(username);
-    // Decode token to get role
+    // Decode token to get roles
     const decoded = decodeJWT(accessToken);
     if (decoded) {
-      setRole(decoded.role || 'user');
+      // Support both new format (roles array) and old format (single role)
+      const userRoles = decoded.roles || (decoded.role ? [decoded.role] : ['user']);
+      setRoles(userRoles);
+      setRole(userRoles[0] || 'user');
     }
   };
 
@@ -96,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setRole(null);
+    setRoles([]);
   };
 
   return (
@@ -103,13 +113,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         role,
+        roles,
         token,
         login,
         register,
         logout,
         isAuthenticated: !!token,
         loading,
-        isAdmin: role === 'admin',
+        isAdmin: roles.includes('admin'),
       }}
     >
       {children}

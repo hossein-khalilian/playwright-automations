@@ -29,7 +29,7 @@ export default function AdminDashboardPage() {
   const isRTL = locale === 'fa';
   const t = useTranslations('admin');
   const tCommon = useTranslations('common');
-  const [testResult, setTestResult] = useState<{ message: string; username: string; role: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ message: string; username: string; roles: string[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [credentials, setCredentials] = useState<GoogleCredential[]>([]);
@@ -185,7 +185,7 @@ export default function AdminDashboardPage() {
                         </AlertDescription>
                         <div className="text-sm text-muted-foreground space-y-1">
                           <p>{t('username')}: {testResult.username}</p>
-                          <p>{t('role')}: {testResult.role}</p>
+                          <p>{t('role')}: {testResult.roles.join(', ')}</p>
                         </div>
                       </div>
                     </div>
