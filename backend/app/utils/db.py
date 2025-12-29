@@ -53,7 +53,7 @@ async def get_notebooks_collection():
     return db["notebooks"]
 
 
-async def create_user(username: str, hashed_password: str) -> bool:
+async def create_user(username: str, hashed_password: str, role: str = "user") -> bool:
     """
     Create a new user in the database.
     Returns True if successful, False if user already exists or database error.
@@ -69,6 +69,7 @@ async def create_user(username: str, hashed_password: str) -> bool:
         user_doc = {
             "username": username,
             "hashed_password": hashed_password,
+            "role": role,
             "created_at": datetime.now(timezone.utc),
             "is_active": True,
         }
@@ -313,6 +314,135 @@ def update_notebook_titles_sync(username: str, titles: dict) -> bool:
     finally:
         if client is not None:
             client.close()
+
+
+async def get_google_credentials_collection():
+    """Get the google_credentials collection from MongoDB."""
+    client = await get_db_client()
+    if client is None:
+        return None
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    db = client[db_name]
+    return db["google_credentials"]
+
+
+async def create_google_credential(email: str, encrypted_password: str) -> bool:
+    """
+    Create a new Google credential in the database.
+    Returns True if successful, False if email already exists or database error.
+    """
+    collection = await get_google_credentials_collection()
+    if collection is None:
+        return False
+
+    try:
+        # Create unique index on email if it doesn't exist
+        await collection.create_index("email", unique=True)
+
+        credential_doc = {
+            "email": email,
+            "encrypted_password": encrypted_password,
+            "created_at": datetime.now(timezone.utc),
+            "is_active": True,
+        }
+        await collection.insert_one(credential_doc)
+        return True
+    except DuplicateKeyError:
+        return False
+    except Exception:
+        return False
+
+
+async def get_google_credential_by_email(email: str) -> Optional[dict]:
+    """Get Google credential document by email."""
+    collection = await get_google_credentials_collection()
+    if collection is None:
+        return None
+
+    try:
+        credential = await collection.find_one({"email": email})
+        return credential
+    except Exception:
+        return None
+
+
+async def get_all_google_credentials() -> List[dict]:
+    """Get all Google credentials (without decrypted passwords)."""
+    collection = await get_google_credentials_collection()
+    if collection is None:
+        return []
+
+    try:
+        cursor = collection.find({"is_active": True}).sort("created_at", -1)
+        credentials = await cursor.to_list(length=None)
+        # Remove encrypted_password from results for security
+        for cred in credentials:
+            cred.pop("encrypted_password", None)
+        return credentials
+    except Exception:
+        return []
+
+
+async def update_google_credential(email: str, encrypted_password: Optional[str] = None, is_active: Optional[bool] = None) -> bool:
+    """
+    Update a Google credential.
+    Returns True if successful, False if database error.
+    """
+    collection = await get_google_credentials_collection()
+    if collection is None:
+        return False
+
+    try:
+        update_data = {}
+        if encrypted_password is not None:
+            update_data["encrypted_password"] = encrypted_password
+        if is_active is not None:
+            update_data["is_active"] = is_active
+
+        if not update_data:
+            return True  # Nothing to update
+
+        result = await collection.update_one(
+            {"email": email},
+            {"$set": update_data}
+        )
+        return result.modified_count > 0 or result.matched_count > 0
+    except Exception:
+        return False
+
+
+async def delete_google_credential(email: str) -> bool:
+    """
+    Delete a Google credential (soft delete by setting is_active to False).
+    Returns True if successful, False if database error.
+    """
+    return await update_google_credential(email, is_active=False)
+
+
+async def get_decrypted_google_credential(email: str) -> Optional[dict]:
+    """
+    Get Google credential with decrypted password.
+    This should only be used internally for authentication purposes.
+    Returns dict with 'email' and 'password' keys, or None if not found.
+    """
+    from app.utils.encryption import decrypt_password
+    
+    credential = await get_google_credential_by_email(email)
+    if not credential or not credential.get("is_active", True):
+        return None
+
+    try:
+        encrypted_password = credential.get("encrypted_password")
+        if not encrypted_password:
+            return None
+
+        decrypted_password = decrypt_password(encrypted_password)
+        return {
+            "email": credential.get("email"),
+            "password": decrypted_password,
+        }
+    except Exception:
+        return None
 
 
 async def close_db_client():

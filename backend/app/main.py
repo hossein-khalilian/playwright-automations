@@ -4,6 +4,7 @@ import sys
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.admin_api import router as admin_router
 from app.routes.auth_api import router as auth_router
 from app.routes.notebooklm_api import router as notebooklm_router
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(notebooklm_router)
+api_router.include_router(admin_router)
 
 
 app = FastAPI(
@@ -30,7 +32,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3003", "*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

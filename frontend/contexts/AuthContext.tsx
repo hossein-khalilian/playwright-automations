@@ -5,18 +5,38 @@ import { authApi } from '@/lib/api-client';
 
 interface AuthContextType {
   user: string | null;
+  role: string | null;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to decode JWT token
+function decodeJWT(token: string): { username?: string; role?: string } | null {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
         setToken(storedToken);
+        // Decode token to get role
+        const decoded = decodeJWT(storedToken);
+        if (decoded) {
+          setRole(decoded.role || 'user');
+        }
         // Verify token by fetching user info
         authApi
           .getMe()
@@ -36,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Token invalid, remove it
             localStorage.removeItem('token');
             setToken(null);
+            setRole(null);
           })
           .finally(() => {
             setLoading(false);
@@ -52,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', accessToken);
     setToken(accessToken);
     setUser(username);
+    // Decode token to get role
+    const decoded = decodeJWT(accessToken);
+    if (decoded) {
+      setRole(decoded.role || 'user');
+    }
   };
 
   const register = async (username: string, password: string) => {
@@ -64,18 +95,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
+    setRole(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        role,
         token,
         login,
         register,
         logout,
         isAuthenticated: !!token,
         loading,
+        isAdmin: role === 'admin',
       }}
     >
       {children}

@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from app.auth import (
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+    CurrentAdmin,
     CurrentUser,
     create_access_token,
     hash_password,
@@ -33,7 +34,7 @@ async def login(request: LoginRequest) -> Token:
 
     access_token_expires = timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username},
+        data={"sub": user.username, "role": user.role},
         expires_delta=access_token_expires,
     )
     return Token(access_token=access_token, token_type="bearer")
@@ -102,3 +103,20 @@ async def read_me(current_user: CurrentUser) -> str:
     Simple endpoint to verify that JWT authentication works.
     """
     return current_user.username
+
+
+@router.get(
+    "/admin/test",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+async def admin_test(current_admin: CurrentAdmin) -> dict:
+    """
+    Test endpoint that requires admin role.
+    Only users with admin role can access this endpoint.
+    """
+    return {
+        "message": "Admin access granted",
+        "username": current_admin.username,
+        "role": current_admin.role,
+    }

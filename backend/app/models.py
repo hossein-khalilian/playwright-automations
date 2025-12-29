@@ -45,10 +45,12 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    role: Optional[str] = None
 
 
 class User(BaseModel):
     username: str
+    role: str = "user"
 
 
 class LoginRequest(BaseModel):
@@ -529,4 +531,41 @@ class ArtifactRenameRequest(BaseModel):
 
 class ArtifactRenameResponse(BaseModel):
     status: str = Field(description="Status of the rename operation")
+    message: str = Field(description="Message describing the result")
+
+
+# Google Credentials Management Models
+class GoogleCredentialCreateRequest(BaseModel):
+    email: str = Field(description="Email address for Google account")
+    password: str = Field(description="Password for Google account (will be encrypted)")
+
+
+class GoogleCredentialUpdateRequest(BaseModel):
+    password: Optional[str] = Field(None, description="New password (will be encrypted)")
+    is_active: Optional[bool] = Field(None, description="Whether the credential is active")
+
+
+class GoogleCredentialResponse(BaseModel):
+    email: str = Field(description="Email address")
+    created_at: datetime = Field(description="When the credential was created")
+    is_active: bool = Field(description="Whether the credential is active")
+
+
+class GoogleCredentialListResponse(BaseModel):
+    credentials: List[GoogleCredentialResponse] = Field(description="List of Google credentials")
+
+
+class GoogleCredentialCreateResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    email: str = Field(description="Email address that was created")
+
+
+class GoogleCredentialUpdateResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+
+
+class GoogleCredentialDeleteResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")

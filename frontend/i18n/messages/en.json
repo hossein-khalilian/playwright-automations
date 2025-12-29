@@ -49,6 +49,7 @@
   },
   "navbar": {
     "notebooks": "Notebooks",
+    "admin": "Admin",
     "welcomeUser": "Welcome, {user}"
   },
   "notebooks": {
@@ -295,6 +296,44 @@
     "images": "Images",
     "reviewCompletedNoDetails": "Review completed but no details were returned.",
     "loadFailed": "Failed to load source review"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "description": "Administrative panel for system management",
+    "adminTest": "Admin Access Test",
+    "adminTestDescription": "Test your admin access to the system",
+    "testAdminAccess": "Test Admin Access",
+    "testing": "Testing...",
+    "testFailed": "Admin access test failed",
+    "username": "Username",
+    "role": "Role",
+    "systemInfo": "System Information",
+    "systemInfoDescription": "Current system status and configuration",
+    "adminAccess": "Admin Access",
+    "enabled": "Enabled",
+    "roleBasedAccess": "Role-Based Access",
+    "active": "Active",
+    "quickActions": "Quick Actions",
+    "quickActionsDescription": "Common administrative tasks",
+    "viewNotebooks": "View Notebooks",
+    "goHome": "Go Home",
+    "googleCredentials": "Google Credentials",
+    "googleCredentialsDescription": "Manage email and password pairs for Google login",
+    "addCredential": "Add Credential",
+    "noCredentials": "No credentials added yet",
+    "createdAt": "Created",
+    "inactive": "Inactive",
+    "email": "Email",
+    "password": "Password",
+    "emailPlaceholder": "example@gmail.com",
+    "passwordPlaceholder": "Enter password",
+    "addCredentialDescription": "Add a new email and password pair. Password will be encrypted.",
+    "emailPasswordRequired": "Email and password are required",
+    "createCredentialFailed": "Failed to create credential",
+    "deleteCredentialFailed": "Failed to delete credential",
+    "loadCredentialsFailed": "Failed to load credentials",
+    "deleteConfirm": "Are you sure you want to delete the credential for {email}?",
+    "creating": "Creating..."
   }
 }
 

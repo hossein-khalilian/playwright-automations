@@ -26,16 +26,13 @@ config = {
     "BROWSER_POOL_SIZE": os.environ.get("BROWSER_POOL_SIZE"),
     "GMAIL_EMAIL": os.environ.get("GMAIL_EMAIL"),
     "GMAIL_PASSWORD": os.environ.get("GMAIL_PASSWORD"),
+    # Encryption key for email passwords
+    "ENCRYPTION_KEY": os.environ.get("ENCRYPTION_KEY"),
 }
+
 
 # Normalize keys to lowercase for easier access (existing behavior)
 config = {key.lower(): value for key, value in config.items()}
+print(config.get("gmail_accounts"))
 # Convert browser_pool_size to int, default to 1 if not set
-browser_pool_size = config.get("browser_pool_size")
-if browser_pool_size:
-    try:
-        config["browser_pool_size"] = int(browser_pool_size)
-    except (ValueError, TypeError):
-        config["browser_pool_size"] = 1
-else:
-    config["browser_pool_size"] = 1
+browser_pool_size = int(config.get("browser_pool_size", 1))

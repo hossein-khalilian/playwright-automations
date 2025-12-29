@@ -134,6 +134,11 @@ export const authApi = {
     const response = await api.get<string>('/auth/me');
     return response.data;
   },
+
+  adminTest: async (): Promise<{ message: string; username: string; role: string }> => {
+    const response = await api.get<{ message: string; username: string; role: string }>('/auth/admin/test');
+    return response.data;
+  },
 };
 
 // Notebook API
@@ -585,6 +590,52 @@ export const artifactApi = {
 export const googleApi = {
   getLoginStatus: async (): Promise<GoogleLoginStatusResponse> => {
     const response = await api.get<GoogleLoginStatusResponse>('/google/login-status');
+    return response.data;
+  },
+};
+
+// Admin API
+import type {
+  GoogleCredential,
+  GoogleCredentialCreateRequest,
+  GoogleCredentialCreateResponse,
+  GoogleCredentialDeleteResponse,
+  GoogleCredentialListResponse,
+  GoogleCredentialUpdateRequest,
+  GoogleCredentialUpdateResponse,
+} from './types';
+
+export const adminApi = {
+  listGoogleCredentials: async (): Promise<GoogleCredentialListResponse> => {
+    const response = await api.get<GoogleCredentialListResponse>('/admin/google-credentials');
+    return response.data;
+  },
+
+  createGoogleCredential: async (
+    data: GoogleCredentialCreateRequest
+  ): Promise<GoogleCredentialCreateResponse> => {
+    const response = await api.post<GoogleCredentialCreateResponse>(
+      '/admin/google-credentials',
+      data
+    );
+    return response.data;
+  },
+
+  updateGoogleCredential: async (
+    email: string,
+    data: GoogleCredentialUpdateRequest
+  ): Promise<GoogleCredentialUpdateResponse> => {
+    const response = await api.put<GoogleCredentialUpdateResponse>(
+      `/admin/google-credentials/${encodeURIComponent(email)}`,
+      data
+    );
+    return response.data;
+  },
+
+  deleteGoogleCredential: async (email: string): Promise<GoogleCredentialDeleteResponse> => {
+    const response = await api.delete<GoogleCredentialDeleteResponse>(
+      `/admin/google-credentials/${encodeURIComponent(email)}`
+    );
     return response.data;
   },
 };

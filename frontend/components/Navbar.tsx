@@ -8,7 +8,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 
 export default function Navbar() {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
   const locale = useLocale();
   const isRTL = locale === 'fa';
@@ -28,13 +28,21 @@ export default function Navbar() {
     <nav className="border-b bg-background shadow-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between">
-          <div className="flex">
+          <div className="flex gap-4">
             <Link
               href="/notebooks"
               className="inline-flex items-center border-b-2 border-primary px-1 pt-1 text-sm font-medium text-foreground transition-colors hover:text-primary"
             >
               {t('notebooks')}
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                {t('admin')}
+              </Link>
+            )}
           </div>
           <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
             {isRTL ? (

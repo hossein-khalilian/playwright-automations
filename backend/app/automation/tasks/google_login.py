@@ -133,7 +133,7 @@ def main(user_profile_name: str = "test_google_login", headless: bool = False):
         if check_google_login_status_sync(page):
             print("[+] Google is already logged in. No need to login again.")
             print("[*] Browser will remain open for 5 seconds. Press Ctrl+C to close.")
-            time.sleep(5)
+            time.sleep(50)
         else:
             print("[*] Not logged in. Starting login process...")
             # Load credentials from environment

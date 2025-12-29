@@ -49,6 +49,7 @@
   },
   "navbar": {
     "notebooks": "دفترچه‌ها",
+    "admin": "مدیر",
     "welcomeUser": "خوش آمدید، {user}"
   },
   "notebooks": {
@@ -295,6 +296,44 @@
     "images": "تصاویر",
     "reviewCompletedNoDetails": "بررسی تکمیل شد اما جزئیاتی برگردانده نشد.",
     "loadFailed": "بارگذاری بررسی منبع ناموفق بود"
+  },
+  "admin": {
+    "title": "پنل مدیریت",
+    "description": "پنل مدیریتی برای مدیریت سیستم",
+    "adminTest": "تست دسترسی مدیر",
+    "adminTestDescription": "دسترسی مدیر خود را به سیستم تست کنید",
+    "testAdminAccess": "تست دسترسی مدیر",
+    "testing": "در حال تست...",
+    "testFailed": "تست دسترسی مدیر ناموفق بود",
+    "username": "نام کاربری",
+    "role": "نقش",
+    "systemInfo": "اطلاعات سیستم",
+    "systemInfoDescription": "وضعیت و پیکربندی فعلی سیستم",
+    "adminAccess": "دسترسی مدیر",
+    "enabled": "فعال",
+    "roleBasedAccess": "دسترسی مبتنی بر نقش",
+    "active": "فعال",
+    "quickActions": "عملیات سریع",
+    "quickActionsDescription": "وظایف مدیریتی رایج",
+    "viewNotebooks": "مشاهده دفترچه‌ها",
+    "goHome": "برو به خانه",
+    "googleCredentials": "اعتبارنامه‌های گوگل",
+    "googleCredentialsDescription": "مدیریت جفت‌های ایمیل و رمز عبور برای ورود به گوگل",
+    "addCredential": "افزودن اعتبارنامه",
+    "noCredentials": "هنوز اعتبارنامه‌ای اضافه نشده است",
+    "createdAt": "ایجاد شده",
+    "inactive": "غیرفعال",
+    "email": "ایمیل",
+    "password": "رمز عبور",
+    "emailPlaceholder": "example@gmail.com",
+    "passwordPlaceholder": "رمز عبور را وارد کنید",
+    "addCredentialDescription": "یک جفت ایمیل و رمز عبور جدید اضافه کنید. رمز عبور رمزگذاری خواهد شد.",
+    "emailPasswordRequired": "ایمیل و رمز عبور الزامی است",
+    "createCredentialFailed": "ایجاد اعتبارنامه ناموفق بود",
+    "deleteCredentialFailed": "حذف اعتبارنامه ناموفق بود",
+    "loadCredentialsFailed": "بارگذاری اعتبارنامه‌ها ناموفق بود",
+    "deleteConfirm": "آیا مطمئن هستید که می‌خواهید اعتبارنامه {email} را حذف کنید؟",
+    "creating": "در حال ایجاد..."
   }
 }
 

@@ -273,3 +273,40 @@ export interface GoogleLoginStatusResponse {
   is_logged_in: boolean;
 }
 
+// Google Credentials Management types
+export interface GoogleCredential {
+  email: string;
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface GoogleCredentialListResponse {
+  credentials: GoogleCredential[];
+}
+
+export interface GoogleCredentialCreateRequest {
+  email: string;
+  password: string;
+}
+
+export interface GoogleCredentialCreateResponse {
+  status: string;
+  message: string;
+  email: string;
+}
+
+export interface GoogleCredentialUpdateRequest {
+  password?: string;
+  is_active?: boolean;
+}
+
+export interface GoogleCredentialUpdateResponse {
+  status: string;
+  message: string;
+}
+
+export interface GoogleCredentialDeleteResponse {
+  status: string;
+  message: string;
+}
+

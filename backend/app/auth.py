@@ -55,7 +55,8 @@ async def verify_credentials(username: str, password: str) -> Optional[User]:
         return None
 
     if verify_password(password, hashed_password):
-        return User(username=username)
+        role = user_doc.get("role", "user")
+        return User(username=username, role=role)
     return None
 
 
@@ -83,9 +84,10 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         username: str | None = payload.get("sub")
+        role: str | None = payload.get("role")
         if username is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
+        token_data = TokenData(username=username, role=role)
     except JWTError:
         raise credentials_exception
 
@@ -94,7 +96,27 @@ async def get_current_user(
     if not user_doc or not user_doc.get("is_active", True):
         raise credentials_exception
 
-    return User(username=token_data.username)
+    # Get role from database (preferred) or from token (fallback)
+    user_role = user_doc.get("role", token_data.role or "user")
+    return User(username=token_data.username, role=user_role)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def get_current_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """
+    Dependency that ensures the current user has admin role.
+    Raises 403 Forbidden if user is not an admin.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions. Admin role required.",
+        )
+    return current_user
+
+
+CurrentAdmin = Annotated[User, Depends(get_current_admin)]
