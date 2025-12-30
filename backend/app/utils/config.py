@@ -33,6 +33,5 @@ config = {
 
 # Normalize keys to lowercase for easier access (existing behavior)
 config = {key.lower(): value for key, value in config.items()}
-print(config.get("gmail_accounts"))
 # Convert browser_pool_size to int, default to 1 if not set
-browser_pool_size = int(config.get("browser_pool_size", 1))
+config.update({"browser_pool_size": int(config.get("browser_pool_size", 1))})

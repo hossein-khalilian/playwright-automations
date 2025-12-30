@@ -382,6 +382,8 @@ async def create_google_credential(email: str, encrypted_password: str) -> bool:
             "encrypted_password": encrypted_password,
             "created_at": datetime.now(timezone.utc),
             "is_active": True,
+            "status": "unknown",  # unknown, working, not_working, checking
+            "status_checked_at": None,
         }
         await collection.insert_one(credential_doc)
         return True
@@ -421,7 +423,13 @@ async def get_all_google_credentials() -> List[dict]:
         return []
 
 
-async def update_google_credential(email: str, encrypted_password: Optional[str] = None, is_active: Optional[bool] = None) -> bool:
+async def update_google_credential(
+    email: str,
+    encrypted_password: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    status: Optional[str] = None,
+    status_checked_at: Optional[datetime] = None,
+) -> bool:
     """
     Update a Google credential.
     Returns True if successful, False if database error.
@@ -436,6 +444,10 @@ async def update_google_credential(email: str, encrypted_password: Optional[str]
             update_data["encrypted_password"] = encrypted_password
         if is_active is not None:
             update_data["is_active"] = is_active
+        if status is not None:
+            update_data["status"] = status
+        if status_checked_at is not None:
+            update_data["status_checked_at"] = status_checked_at
 
         if not update_data:
             return True  # Nothing to update
@@ -481,6 +493,104 @@ async def get_decrypted_google_credential(email: str) -> Optional[dict]:
         }
     except Exception:
         return None
+
+
+# Sync versions for Celery tasks
+def get_google_credential_by_email_sync(email: str) -> Optional[dict]:
+    """Get Google credential document by email (sync version for Celery tasks)."""
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return None
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["google_credentials"]
+        
+        credential = collection.find_one({"email": email})
+        return credential
+    except Exception:
+        return None
+    finally:
+        if client is not None:
+            client.close()
+
+
+def get_decrypted_google_credential_sync(email: str) -> Optional[dict]:
+    """
+    Get Google credential with decrypted password (sync version for Celery tasks).
+    This should only be used internally for authentication purposes.
+    Returns dict with 'email' and 'password' keys, or None if not found.
+    """
+    from app.utils.encryption import decrypt_password
+    
+    credential = get_google_credential_by_email_sync(email)
+    if not credential or not credential.get("is_active", True):
+        return None
+
+    try:
+        encrypted_password = credential.get("encrypted_password")
+        if not encrypted_password:
+            return None
+
+        decrypted_password = decrypt_password(encrypted_password)
+        return {
+            "email": credential.get("email"),
+            "password": decrypted_password,
+        }
+    except Exception:
+        return None
+
+
+def update_google_credential_sync(
+    email: str,
+    encrypted_password: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    status: Optional[str] = None,
+    status_checked_at: Optional[datetime] = None,
+) -> bool:
+    """
+    Update a Google credential (sync version for Celery tasks).
+    Returns True if successful, False if database error.
+    """
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return False
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["google_credentials"]
+        
+        update_data = {}
+        if encrypted_password is not None:
+            update_data["encrypted_password"] = encrypted_password
+        if is_active is not None:
+            update_data["is_active"] = is_active
+        if status is not None:
+            update_data["status"] = status
+        if status_checked_at is not None:
+            update_data["status_checked_at"] = status_checked_at
+        
+        if not update_data:
+            return True  # Nothing to update
+        
+        result = collection.update_one(
+            {"email": email},
+            {"$set": update_data}
+        )
+        return result.modified_count > 0 or result.matched_count > 0
+    except Exception:
+        return False
+    finally:
+        if client is not None:
+            client.close()
 
 
 async def close_db_client():

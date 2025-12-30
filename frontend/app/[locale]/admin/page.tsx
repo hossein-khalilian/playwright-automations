@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Shield, CheckCircle2, XCircle, Plus, Trash2, Mail, Pencil } from 'lucide-react';
+import { Loader2, Shield, CheckCircle2, XCircle, Plus, Trash2, Mail, Pencil, RefreshCw, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +43,7 @@ export default function AdminDashboardPage() {
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [editPassword, setEditPassword] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -163,6 +164,103 @@ export default function AdminDashboardPage() {
       setError(err.response?.data?.detail || t('updateCredentialFailed'));
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleCheckCredential = async (email: string) => {
+    setCheckingEmail(email);
+    setError('');
+
+    try {
+      // Submit the check task
+      const submission = await adminApi.checkGoogleCredential(email);
+      
+      if (!submission.task_id) {
+        throw new Error('Task submission did not return a task_id');
+      }
+
+      // Poll for task status
+      const pollInterval = 2000; // Poll every 2 seconds
+      const maxAttempts = 30; // Maximum 60 seconds
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        
+        try {
+          const status = await adminApi.getGoogleCredentialCheckStatus(submission.task_id);
+          
+          if (status.status === 'success') {
+            // Task completed successfully
+            await loadCredentials(); // Reload to get updated status
+            setError(''); // Clear any previous errors
+            break;
+          } else if (status.status === 'failure') {
+            // Task failed
+            setError(status.message || t('checkCredentialFailed'));
+            await loadCredentials(); // Reload to get updated status
+            break;
+          }
+          // If still pending, continue polling
+        } catch (pollErr: any) {
+          // If polling fails, log but continue
+          console.warn('Error polling credential check status:', pollErr);
+          if (attempt === maxAttempts - 1) {
+            setError(t('checkCredentialFailed'));
+          }
+        }
+      }
+      
+      // Final reload to ensure we have the latest status
+      await loadCredentials();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || t('checkCredentialFailed'));
+    } finally {
+      setCheckingEmail(null);
+    }
+  };
+
+  const getStatusBadge = (cred: GoogleCredential) => {
+    const status = cred.status || 'unknown';
+    const isChecking = checkingEmail === cred.email;
+    
+    if (isChecking) {
+      return (
+        <span className="inline-flex items-center gap-1 text-sm text-blue-600">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('checking')}
+        </span>
+      );
+    }
+
+    switch (status) {
+      case 'working':
+        return (
+          <span className="inline-flex items-center gap-1 text-sm text-green-600">
+            <CheckCircle2 className="h-3 w-3" />
+            {t('working')}
+          </span>
+        );
+      case 'not_working':
+        return (
+          <span className="inline-flex items-center gap-1 text-sm text-red-600">
+            <XCircle className="h-3 w-3" />
+            {t('notWorking')}
+          </span>
+        );
+      case 'checking':
+        return (
+          <span className="inline-flex items-center gap-1 text-sm text-blue-600">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t('checking')}
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+            <AlertCircle className="h-3 w-3" />
+            {t('unknown')}
+          </span>
+        );
     }
   };
 
@@ -317,12 +415,20 @@ export default function AdminDashboardPage() {
                       className="flex items-center justify-between p-3 border rounded-lg"
                     >
                       <div className="flex-1">
-                        <div className="font-medium">{cred.email}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {cred.email}
+                          {getStatusBadge(cred)}
+                        </div>
                         <div className="text-sm text-muted-foreground">
                           {t('createdAt')}: {new Date(cred.created_at).toLocaleString()}
                           {!cred.is_active && (
                             <span className={`${isRTL ? 'mr-2' : 'ml-2'} text-orange-500`}>
                               ({t('inactive')})
+                            </span>
+                          )}
+                          {cred.status_checked_at && (
+                            <span className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
+                              • {t('lastChecked')}: {new Date(cred.status_checked_at).toLocaleString()}
                             </span>
                           )}
                         </div>
@@ -331,8 +437,21 @@ export default function AdminDashboardPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleCheckCredential(cred.email)}
+                          disabled={checkingEmail === cred.email || deletingEmail === cred.email}
+                          title={t('checkCredential')}
+                        >
+                          {checkingEmail === cred.email ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleStartEdit(cred.email)}
-                          disabled={deletingEmail === cred.email}
+                          disabled={deletingEmail === cred.email || checkingEmail === cred.email}
                           title={tCommon('edit')}
                         >
                           <Pencil className="h-4 w-4" />
@@ -341,7 +460,7 @@ export default function AdminDashboardPage() {
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteCredential(cred.email)}
-                          disabled={deletingEmail === cred.email}
+                          disabled={deletingEmail === cred.email || checkingEmail === cred.email}
                           title={tCommon('delete')}
                         >
                           {deletingEmail === cred.email ? (

@@ -278,6 +278,8 @@ export interface GoogleCredential {
   email: string;
   created_at: string;
   is_active: boolean;
+  status?: string; // unknown, working, not_working, checking
+  status_checked_at?: string;
 }
 
 export interface GoogleCredentialListResponse {
@@ -303,6 +305,12 @@ export interface GoogleCredentialUpdateRequest {
 export interface GoogleCredentialUpdateResponse {
   status: string;
   message: string;
+}
+
+export interface GoogleCredentialCheckResponse {
+  status: string;
+  message: string;
+  is_working: boolean;
 }
 
 export interface GoogleCredentialDeleteResponse {

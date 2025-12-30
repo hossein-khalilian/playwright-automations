@@ -340,7 +340,14 @@
     "passwordRequired": "رمز عبور الزامی است",
     "passwordMinLength": "رمز عبور باید حداقل ۶ کاراکتر باشد",
     "updateCredentialFailed": "به‌روزرسانی اعتبارنامه ناموفق بود",
-    "updating": "در حال به‌روزرسانی..."
+    "updating": "در حال به‌روزرسانی...",
+    "checkCredential": "بررسی اعتبارنامه",
+    "checkCredentialFailed": "بررسی اعتبارنامه ناموفق بود",
+    "working": "کار می‌کند",
+    "notWorking": "کار نمی‌کند",
+    "checking": "در حال بررسی...",
+    "unknown": "نامشخص",
+    "lastChecked": "آخرین بررسی"
   }
 }
 

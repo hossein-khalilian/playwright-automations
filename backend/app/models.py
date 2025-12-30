@@ -549,6 +549,8 @@ class GoogleCredentialResponse(BaseModel):
     email: str = Field(description="Email address")
     created_at: datetime = Field(description="When the credential was created")
     is_active: bool = Field(description="Whether the credential is active")
+    status: Optional[str] = Field(None, description="Status of the credential: unknown, working, not_working, checking")
+    status_checked_at: Optional[datetime] = Field(None, description="When the status was last checked")
 
 
 class GoogleCredentialListResponse(BaseModel):
@@ -569,3 +571,9 @@ class GoogleCredentialUpdateResponse(BaseModel):
 class GoogleCredentialDeleteResponse(BaseModel):
     status: str = Field(description="Status of the operation")
     message: str = Field(description="Message describing the result")
+
+
+class GoogleCredentialCheckResponse(BaseModel):
+    status: str = Field(description="Status of the operation")
+    message: str = Field(description="Message describing the result")
+    is_working: bool = Field(description="Whether the credentials are working")

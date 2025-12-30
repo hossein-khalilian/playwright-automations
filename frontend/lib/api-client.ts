@@ -603,6 +603,8 @@ import type {
   GoogleCredentialListResponse,
   GoogleCredentialUpdateRequest,
   GoogleCredentialUpdateResponse,
+  TaskSubmissionResponse,
+  TaskStatusResponse,
 } from './types';
 
 export const adminApi = {
@@ -635,6 +637,20 @@ export const adminApi = {
   deleteGoogleCredential: async (email: string): Promise<GoogleCredentialDeleteResponse> => {
     const response = await api.delete<GoogleCredentialDeleteResponse>(
       `/admin/google-credentials/${encodeURIComponent(email)}`
+    );
+    return response.data;
+  },
+
+  checkGoogleCredential: async (email: string): Promise<TaskSubmissionResponse> => {
+    const response = await api.post<TaskSubmissionResponse>(
+      `/admin/google-credentials/${encodeURIComponent(email)}/check`
+    );
+    return response.data;
+  },
+
+  getGoogleCredentialCheckStatus: async (taskId: string): Promise<TaskStatusResponse> => {
+    const response = await api.get<TaskStatusResponse>(
+      `/admin/google-credentials/check/${taskId}`
     );
     return response.data;
   },

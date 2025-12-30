@@ -1,6 +1,9 @@
+import logging
 from datetime import datetime
 
 from app.auth import CurrentAdmin
+from app.celery_app import celery_app
+from app.celery_tasks.google_credentials import check_google_credential_task
 from app.models import (
     GoogleCredentialCreateRequest,
     GoogleCredentialCreateResponse,
@@ -9,6 +12,8 @@ from app.models import (
     GoogleCredentialResponse,
     GoogleCredentialUpdateRequest,
     GoogleCredentialUpdateResponse,
+    TaskStatusResponse,
+    TaskSubmissionResponse,
 )
 from app.utils.db import (
     create_google_credential,
@@ -18,7 +23,10 @@ from app.utils.db import (
     update_google_credential,
 )
 from app.utils.encryption import encrypt_password
+from celery.result import AsyncResult
 from fastapi import APIRouter, HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -40,6 +48,8 @@ async def list_google_credentials(current_admin: CurrentAdmin) -> GoogleCredenti
             email=cred["email"],
             created_at=cred.get("created_at", datetime.now()),
             is_active=cred.get("is_active", True),
+            status=cred.get("status", "unknown"),
+            status_checked_at=cred.get("status_checked_at"),
         )
         for cred in credentials
     ]
@@ -224,6 +234,77 @@ async def delete_google_credential_endpoint(
     return GoogleCredentialDeleteResponse(
         status="success",
         message="Google credential deleted successfully",
+    )
+
+
+@router.post(
+    "/google-credentials/{email}/check",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def check_google_credential_endpoint(
+    email: str,
+    current_admin: CurrentAdmin,
+) -> TaskSubmissionResponse:
+    """
+    Check if Google credentials are working (admin only).
+    This submits a Celery task that will attempt to log in with the credentials
+    and update the status in the database.
+    Returns a task_id that can be used to check the task status.
+    """
+    # Check if credential exists
+    existing = await get_google_credential_by_email(email)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Google credential not found",
+        )
+
+    # Submit Celery task
+    task = check_google_credential_task.delay(email)
+    
+    return TaskSubmissionResponse(task_id=task.id, status="submitted")
+
+
+@router.get(
+    "/google-credentials/check/{task_id}",
+    response_model=TaskStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def check_google_credential_status_endpoint(
+    task_id: str,
+    current_admin: CurrentAdmin,
+) -> TaskStatusResponse:
+    """
+    Get the status of a Google credential check task (admin only).
+    """
+    res = AsyncResult(task_id, app=celery_app)
+    state = res.state
+    status_txt = "pending"
+    message = None
+    result_payload = None
+
+    if state == "SUCCESS":
+        status_txt = "success"
+        result_payload = res.result
+        if isinstance(result_payload, dict):
+            message = result_payload.get("message", str(result_payload))
+        else:
+            message = str(result_payload)
+    elif state in {"FAILURE", "REVOKED"}:
+        status_txt = "failure"
+        try:
+            result_payload = res.result
+            message = str(result_payload)
+        except Exception:
+            message = None
+
+    return TaskStatusResponse(
+        task_id=task_id,
+        state=state,
+        status=status_txt,
+        message=message,
+        result=result_payload if status_txt == "success" else None,
     )
 
 

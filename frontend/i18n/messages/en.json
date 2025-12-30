@@ -340,7 +340,14 @@
     "passwordRequired": "Password is required",
     "passwordMinLength": "Password must be at least 6 characters long",
     "updateCredentialFailed": "Failed to update credential",
-    "updating": "Updating..."
+    "updating": "Updating...",
+    "checkCredential": "Check Credential",
+    "checkCredentialFailed": "Failed to check credential",
+    "working": "Working",
+    "notWorking": "Not Working",
+    "checking": "Checking...",
+    "unknown": "Unknown",
+    "lastChecked": "Last checked"
   }
 }
 

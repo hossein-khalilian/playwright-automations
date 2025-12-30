@@ -14,7 +14,7 @@ celery_app = Celery(
     "worker",
     broker=config.get("celery_broker_url"),
     backend=config.get("celery_result_backend"),
-    include=["app.celery_tasks.notebooklm"],
+    include=["app.celery_tasks.notebooklm", "app.celery_tasks.google_credentials"],
 )
 
 celery_app.conf.update(

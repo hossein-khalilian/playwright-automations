@@ -151,7 +151,7 @@ def main():
         print(f"[*] Navigated to: {page.url}")
         result = check_google_login_status_sync(page)
         print(f"[*] Google login status: {result}")
-        # Keep the browser open - use asyncio to run input in executor to avoid blocking
+        # Keep the browser open
         input("\n[*] Press Enter to close the browser...")
     except KeyboardInterrupt:
         print("\n[*] Closing browser...")
