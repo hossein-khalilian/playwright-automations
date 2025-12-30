@@ -34,6 +34,12 @@ fi
 
 # Run playwright codegen
 echo "[*] Starting playwright codegen..."
+echo "[*] Note: Standard codegen CLI cannot use initialize_page_sync's stealth mode."
+echo "[*] For full stealth mode, use: python3 backend/scripts/codegen_notebooklm_stealth.py"
+echo ""
 cd "$PROJECT_ROOT"
-playwright codegen --user-data-dir="browser_profiles/test_google_login" notebooklm.google.com
+playwright codegen \
+  --user-data-dir="browser_profiles/test_google_login" \
+  --browser=chromium \
+  notebooklm.google.com
 
