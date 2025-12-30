@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Shield, CheckCircle2, XCircle, Plus, Trash2, Mail } from 'lucide-react';
+import { Loader2, Shield, CheckCircle2, XCircle, Plus, Trash2, Mail, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,10 @@ export default function AdminDashboardPage() {
   const [newPassword, setNewPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [editPassword, setEditPassword] = useState('');
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -123,6 +127,42 @@ export default function AdminDashboardPage() {
       setError(err.response?.data?.detail || t('deleteCredentialFailed'));
     } finally {
       setDeletingEmail(null);
+    }
+  };
+
+  const handleStartEdit = (email: string) => {
+    setEditingEmail(email);
+    setEditPassword('');
+    setShowEditDialog(true);
+    setError('');
+  };
+
+  const handleUpdateCredential = async () => {
+    if (!editingEmail || !editPassword) {
+      setError(t('passwordRequired'));
+      return;
+    }
+
+    if (editPassword.length < 6) {
+      setError(t('passwordMinLength'));
+      return;
+    }
+
+    setUpdating(true);
+    setError('');
+
+    try {
+      await adminApi.updateGoogleCredential(editingEmail, {
+        password: editPassword,
+      });
+      setShowEditDialog(false);
+      setEditingEmail(null);
+      setEditPassword('');
+      await loadCredentials();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || t('updateCredentialFailed'));
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -287,18 +327,30 @@ export default function AdminDashboardPage() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteCredential(cred.email)}
-                        disabled={deletingEmail === cred.email}
-                      >
-                        {deletingEmail === cred.email ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <div className={`flex gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStartEdit(cred.email)}
+                          disabled={deletingEmail === cred.email}
+                          title={tCommon('edit')}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteCredential(cred.email)}
+                          disabled={deletingEmail === cred.email}
+                          title={tCommon('delete')}
+                        >
+                          {deletingEmail === cred.email ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -349,6 +401,53 @@ export default function AdminDashboardPage() {
                 </>
               ) : (
                 tCommon('create')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Credential Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('editCredential')}</DialogTitle>
+            <DialogDescription>{t('editCredentialDescription', { email: editingEmail })}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">{t('email')}</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editingEmail || ''}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-password">{t('password')}</Label>
+              <Input
+                id="edit-password"
+                type="password"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                placeholder={t('passwordPlaceholder')}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              {tCommon('cancel')}
+            </Button>
+            <Button onClick={handleUpdateCredential} disabled={updating}>
+              {updating ? (
+                <>
+                  <Loader2 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'} animate-spin`} />
+                  {t('updating')}
+                </>
+              ) : (
+                tCommon('update')
               )}
             </Button>
           </DialogFooter>

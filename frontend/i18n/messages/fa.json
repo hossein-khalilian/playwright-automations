@@ -15,6 +15,7 @@
     "previous": "قبلی",
     "open": "باز کردن",
     "create": "ایجاد",
+    "update": "به‌روزرسانی",
     "submit": "ارسال",
     "upload": "آپلود",
     "download": "دانلود",
@@ -333,7 +334,13 @@
     "deleteCredentialFailed": "حذف اعتبارنامه ناموفق بود",
     "loadCredentialsFailed": "بارگذاری اعتبارنامه‌ها ناموفق بود",
     "deleteConfirm": "آیا مطمئن هستید که می‌خواهید اعتبارنامه {email} را حذف کنید؟",
-    "creating": "در حال ایجاد..."
+    "creating": "در حال ایجاد...",
+    "editCredential": "ویرایش اعتبارنامه",
+    "editCredentialDescription": "رمز عبور {email} را به‌روزرسانی کنید. رمز عبور رمزگذاری خواهد شد.",
+    "passwordRequired": "رمز عبور الزامی است",
+    "passwordMinLength": "رمز عبور باید حداقل ۶ کاراکتر باشد",
+    "updateCredentialFailed": "به‌روزرسانی اعتبارنامه ناموفق بود",
+    "updating": "در حال به‌روزرسانی..."
   }
 }
 

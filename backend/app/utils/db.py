@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Union
 
+from bson import ObjectId
 from pymongo import AsyncMongoClient, MongoClient
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
 
@@ -73,7 +74,7 @@ async def get_notebooks_collection():
     return db["notebooks"]
 
 
-async def create_user(username: str, hashed_password: str, roles: List[str] = None) -> bool:
+async def create_user(username: str, hashed_password: str, role_names: List[str] = None) -> bool:
     """
     Create a new user in the database.
     Returns True if successful, False if user already exists or database error.
@@ -87,13 +88,26 @@ async def create_user(username: str, hashed_password: str, roles: List[str] = No
         await collection.create_index("username", unique=True)
 
         # Default to ["user"] if no roles provided
-        if roles is None:
-            roles = ["user"]
+        if role_names is None:
+            role_names = ["user"]
+
+        # Convert role names to role_ids
+        role_ids = []
+        for role_name in role_names:
+            role_id = await get_role_id_by_name(role_name)
+            if role_id:
+                role_ids.append(role_id)
+        
+        # If no valid role_ids found, default to user role
+        if not role_ids:
+            user_role_id = await get_role_id_by_name("user")
+            if user_role_id:
+                role_ids = [user_role_id]
 
         user_doc = {
             "username": username,
             "hashed_password": hashed_password,
-            "roles": roles,
+            "role_ids": role_ids,
             "created_at": datetime.now(timezone.utc),
             "is_active": True,
         }
@@ -479,14 +493,14 @@ async def close_db_client():
 
 # Role and Permission Management Functions
 
-async def create_role(role_name: str, description: str = "", permissions: List[str] = None) -> bool:
+async def create_role(role_name: str, description: str = "", permissions: List[str] = None) -> Optional[ObjectId]:
     """
     Create a new role in the database.
-    Returns True if successful, False if role already exists or database error.
+    Returns role_id (ObjectId) if successful, None if role already exists or database error.
     """
     collection = await get_roles_collection()
     if collection is None:
-        return False
+        return None
 
     try:
         # Create unique index on role_name if it doesn't exist
@@ -498,12 +512,12 @@ async def create_role(role_name: str, description: str = "", permissions: List[s
             "permissions": permissions or [],
             "created_at": datetime.now(timezone.utc),
         }
-        await collection.insert_one(role_doc)
-        return True
+        result = await collection.insert_one(role_doc)
+        return result.inserted_id
     except DuplicateKeyError:
-        return False
+        return None
     except Exception:
-        return False
+        return None
 
 
 async def get_role_by_name(role_name: str) -> Optional[dict]:
@@ -517,6 +531,30 @@ async def get_role_by_name(role_name: str) -> Optional[dict]:
         return role
     except Exception:
         return None
+
+
+async def get_role_by_id(role_id: Union[ObjectId, str]) -> Optional[dict]:
+    """Get role document by role ID. Accepts both ObjectId and string."""
+    collection = await get_roles_collection()
+    if collection is None:
+        return None
+
+    try:
+        # Handle both ObjectId and string formats
+        if isinstance(role_id, str):
+            role_id = ObjectId(role_id)
+        role = await collection.find_one({"_id": role_id})
+        return role
+    except Exception:
+        return None
+
+
+async def get_role_id_by_name(role_name: str) -> Optional[ObjectId]:
+    """Get role ID (ObjectId) by role name."""
+    role = await get_role_by_name(role_name)
+    if role:
+        return role.get("_id")
+    return None
 
 
 async def get_all_roles() -> List[dict]:
@@ -552,23 +590,58 @@ async def update_role_permissions(role_name: str, permissions: List[str]) -> boo
         return False
 
 
-async def get_user_roles(username: str) -> List[str]:
+async def get_user_role_ids(username: str) -> List[ObjectId]:
     """
-    Get all roles for a user.
-    Returns list of role names, or empty list if error.
+    Get all role IDs for a user.
+    Returns list of role IDs (ObjectIds), or empty list if error.
     """
     user_doc = await get_user_by_username(username)
     if not user_doc:
         return []
     
-    # Support both old format (single role) and new format (roles list)
+    # Check for role_ids field (new format)
+    if "role_ids" in user_doc:
+        role_ids = user_doc.get("role_ids", [])
+        # Convert string IDs to ObjectId if needed
+        return [ObjectId(rid) if isinstance(rid, str) else rid for rid in role_ids if rid]
+    
+    # Legacy support: if roles field exists (role names), convert to role_ids
     if "roles" in user_doc:
-        return user_doc.get("roles", [])
-    elif "role" in user_doc:
-        # Migration: convert old single role to list
-        return [user_doc.get("role", "user")]
-    else:
-        return ["user"]
+        role_names = user_doc.get("roles", [])
+        role_ids = []
+        for role_name in role_names:
+            role_id = await get_role_id_by_name(role_name)
+            if role_id:
+                role_ids.append(role_id)
+        return role_ids
+    
+    # Legacy support: single role field
+    if "role" in user_doc:
+        role_name = user_doc.get("role", "user")
+        role_id = await get_role_id_by_name(role_name)
+        return [role_id] if role_id else []
+    
+    # Default: return user role ID
+    user_role_id = await get_role_id_by_name("user")
+    return [user_role_id] if user_role_id else []
+
+
+async def get_user_roles(username: str) -> List[str]:
+    """
+    Get all role names for a user (resolved from role_ids).
+    Returns list of role names, or empty list if error.
+    """
+    role_ids = await get_user_role_ids(username)
+    if not role_ids:
+        return []
+    
+    role_names = []
+    for role_id in role_ids:
+        role = await get_role_by_id(role_id)
+        if role:
+            role_names.append(role.get("role_name"))
+    
+    return role_names
 
 
 async def get_user_permissions(username: str) -> List[str]:
@@ -576,8 +649,8 @@ async def get_user_permissions(username: str) -> List[str]:
     Get all permissions for a user based on their roles.
     Returns list of unique permission names.
     """
-    roles = await get_user_roles(username)
-    if not roles:
+    role_ids = await get_user_role_ids(username)
+    if not role_ids:
         return []
     
     collection = await get_roles_collection()
@@ -587,8 +660,8 @@ async def get_user_permissions(username: str) -> List[str]:
     try:
         # Get all roles and collect their permissions
         all_permissions = set()
-        for role_name in roles:
-            role = await get_role_by_name(role_name)
+        for role_id in role_ids:
+            role = await get_role_by_id(role_id)
             if role:
                 role_permissions = role.get("permissions", [])
                 all_permissions.update(role_permissions)
@@ -612,8 +685,8 @@ async def user_has_role(username: str, role_name: str) -> bool:
     Check if a user has a specific role.
     Returns True if user has the role, False otherwise.
     """
-    roles = await get_user_roles(username)
-    return role_name in roles
+    role_names = await get_user_roles(username)
+    return role_name in role_names
 
 
 async def add_role_to_user(username: str, role_name: str) -> bool:
@@ -626,15 +699,20 @@ async def add_role_to_user(username: str, role_name: str) -> bool:
         return False
 
     try:
-        # Get current roles
-        roles = await get_user_roles(username)
+        # Get role_id from role_name
+        role_id = await get_role_id_by_name(role_name)
+        if not role_id:
+            return False
         
-        # Add role if not already present
-        if role_name not in roles:
-            roles.append(role_name)
+        # Get current role_ids
+        role_ids = await get_user_role_ids(username)
+        
+        # Add role_id if not already present
+        if role_id not in role_ids:
+            role_ids.append(role_id)
             result = await collection.update_one(
                 {"username": username},
-                {"$set": {"roles": roles}}
+                {"$set": {"role_ids": role_ids}}
             )
             return result.modified_count > 0 or result.matched_count > 0
         return True  # Role already exists
@@ -652,19 +730,26 @@ async def remove_role_from_user(username: str, role_name: str) -> bool:
         return False
 
     try:
-        # Get current roles
-        roles = await get_user_roles(username)
+        # Get role_id from role_name
+        role_id = await get_role_id_by_name(role_name)
+        if not role_id:
+            return False
         
-        # Remove role if present
-        if role_name in roles:
-            roles.remove(role_name)
-            # Ensure user has at least one role
-            if not roles:
-                roles = ["user"]
+        # Get current role_ids
+        role_ids = await get_user_role_ids(username)
+        
+        # Remove role_id if present
+        if role_id in role_ids:
+            role_ids.remove(role_id)
+            # Ensure user has at least one role (default to user role)
+            if not role_ids:
+                user_role_id = await get_role_id_by_name("user")
+                if user_role_id:
+                    role_ids = [user_role_id]
             
             result = await collection.update_one(
                 {"username": username},
-                {"$set": {"roles": roles}}
+                {"$set": {"role_ids": role_ids}}
             )
             return result.modified_count > 0 or result.matched_count > 0
         return True  # Role didn't exist

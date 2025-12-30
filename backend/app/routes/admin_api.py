@@ -83,12 +83,7 @@ async def create_google_credential_endpoint(
 
     # Check if credential already exists
     existing = await get_google_credential_by_email(request.email)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already exists",
-        )
-
+    
     # Encrypt password
     try:
         encrypted_password = encrypt_password(request.password)
@@ -98,7 +93,32 @@ async def create_google_credential_endpoint(
             detail=f"Failed to encrypt password: {str(e)}",
         )
 
-    # Create credential
+    # If credential exists and is active, throw error
+    if existing and existing.get("is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already exists",
+        )
+    
+    # If credential exists but is inactive, reactivate and update it (upsert)
+    if existing and not existing.get("is_active", True):
+        success = await update_google_credential(
+            request.email,
+            encrypted_password=encrypted_password,
+            is_active=True,
+        )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update credential. Database may be unavailable.",
+            )
+        return GoogleCredentialCreateResponse(
+            status="success",
+            message="Google credential reactivated and updated successfully",
+            email=request.email,
+        )
+
+    # Create new credential if it doesn't exist
     success = await create_google_credential(request.email, encrypted_password)
 
     if not success:
@@ -205,5 +225,6 @@ async def delete_google_credential_endpoint(
         status="success",
         message="Google credential deleted successfully",
     )
+
 
 

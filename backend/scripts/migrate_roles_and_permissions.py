@@ -24,6 +24,7 @@ sys.path.insert(0, str(backend_dir))
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
+from bson import ObjectId
 
 # Load environment variables
 load_dotenv()
@@ -119,34 +120,52 @@ def migrate_users():
         else:
             print(f"\n✓ Created {roles_created} new role(s)")
         
-        # Step 2: Migrate users from 'role' to 'roles'
+        # Step 2: Migrate users from role names to role_ids
         print("\n" + "=" * 60)
-        print("Step 2: Migrating users from 'role' to 'roles'")
+        print("Step 2: Migrating users from role names to role_ids")
         print("=" * 60)
         
-        # Find all users that have 'role' field but not 'roles' field
+        # Find all users that need migration:
+        # - Users with 'role' field (old single role)
+        # - Users with 'roles' field but not 'role_ids' (role names array)
         query = {
-            "role": {"$exists": True},
-            "roles": {"$exists": False}
+            "$or": [
+                {"role": {"$exists": True}},
+                {"roles": {"$exists": True}, "role_ids": {"$exists": False}}
+            ]
         }
         
         # Count documents to update
         count = users_collection.count_documents(query)
-        print(f"\nFound {count} user(s) with old 'role' field")
+        print(f"\nFound {count} user(s) that need migration to role_ids")
         
         if count == 0:
-            print("✓ No users need migration. All users already have 'roles' field")
+            print("✓ No users need migration. All users already have 'role_ids' field")
         else:
+            # Build a mapping of role names to role_ids
+            role_name_to_id = {}
+            all_roles = list(roles_collection.find({}, {"_id": 1, "role_name": 1}))
+            for role in all_roles:
+                role_name_to_id[role["role_name"]] = role["_id"]
+            
             # Show preview of users to be migrated
             print("\nUsers to be migrated:")
-            users_to_migrate = list(users_collection.find(query, {"username": 1, "role": 1}).limit(10))
+            users_to_migrate = list(users_collection.find(query, {"username": 1, "role": 1, "roles": 1}).limit(10))
             for user in users_to_migrate:
-                print(f"  - {user.get('username', 'unknown')}: '{user.get('role', 'unknown')}' -> ['{user.get('role', 'user')}']")
+                username = user.get("username", "unknown")
+                if "role" in user:
+                    old_role = user.get("role", "user")
+                    role_id = role_name_to_id.get(old_role)
+                    print(f"  - {username}: '{old_role}' -> role_id: {role_id}")
+                elif "roles" in user:
+                    old_roles = user.get("roles", [])
+                    role_ids = [role_name_to_id.get(r) for r in old_roles if r in role_name_to_id]
+                    print(f"  - {username}: {old_roles} -> role_ids: {role_ids}")
             if count > 10:
                 print(f"  ... and {count - 10} more")
             
             # Ask for confirmation
-            print(f"\nThis will migrate {count} user(s) from 'role' to 'roles' array")
+            print(f"\nThis will migrate {count} user(s) from role names to role_ids")
             response = input("Do you want to proceed? (yes/no): ").strip().lower()
             
             if response not in ["yes", "y"]:
@@ -160,24 +179,66 @@ def migrate_users():
             
             for user in users_collection.find(query):
                 try:
-                    old_role = user.get("role", "user")
                     username = user.get("username", "unknown")
+                    role_ids = []
                     
-                    # Convert single role to roles array
-                    new_roles = [old_role] if old_role else ["user"]
+                    # Handle old single 'role' field
+                    if "role" in user:
+                        old_role = user.get("role", "user")
+                        role_id = role_name_to_id.get(old_role)
+                        if role_id:
+                            role_ids = [role_id]
+                        else:
+                            # Default to user role if role not found
+                            user_role_id = role_name_to_id.get("user")
+                            if user_role_id:
+                                role_ids = [user_role_id]
+                            errors.append(f"Role '{old_role}' not found for {username}, defaulted to 'user'")
+                    
+                    # Handle 'roles' array (role names)
+                    elif "roles" in user:
+                        old_roles = user.get("roles", [])
+                        for role_name in old_roles:
+                            role_id = role_name_to_id.get(role_name)
+                            if role_id:
+                                role_ids.append(role_id)
+                            else:
+                                errors.append(f"Role '{role_name}' not found for {username}")
+                        
+                        # If no valid role_ids found, default to user role
+                        if not role_ids:
+                            user_role_id = role_name_to_id.get("user")
+                            if user_role_id:
+                                role_ids = [user_role_id]
+                    
+                    # If still no role_ids, skip this user
+                    if not role_ids:
+                        errors.append(f"No valid role_ids found for {username}")
+                        continue
                     
                     # Update user document
+                    update_op = {
+                        "$set": {"role_ids": role_ids}
+                    }
+                    # Remove old fields
+                    unset_op = {}
+                    if "role" in user:
+                        unset_op["role"] = ""
+                    if "roles" in user and "role_ids" not in user:
+                        unset_op["roles"] = ""
+                    
+                    if unset_op:
+                        update_op["$unset"] = unset_op
+                    
                     result = users_collection.update_one(
                         {"_id": user["_id"]},
-                        {
-                            "$set": {"roles": new_roles},
-                            "$unset": {"role": ""}
-                        }
+                        update_op
                     )
                     
                     if result.modified_count > 0:
                         migrated_count += 1
-                        print(f"  ✓ Migrated {username}: '{old_role}' -> {new_roles}")
+                        role_names = [r["role_name"] for r in all_roles if r["_id"] in role_ids]
+                        print(f"  ✓ Migrated {username}: {role_names} -> {len(role_ids)} role_id(s)")
                     else:
                         errors.append(f"Failed to migrate {username}")
                         
@@ -187,56 +248,85 @@ def migrate_users():
             print(f"\n✓ User migration complete!")
             print(f"  - Users migrated: {migrated_count}")
             if errors:
-                print(f"  - Errors: {len(errors)}")
-                for error in errors:
+                print(f"  - Errors/Warnings: {len(errors)}")
+                for error in errors[:10]:  # Show first 10 errors
                     print(f"    - {error}")
+                if len(errors) > 10:
+                    print(f"    ... and {len(errors) - 10} more errors")
         
-        # Step 3: Clean up any users that have both 'role' and 'roles' (shouldn't happen, but just in case)
+        # Step 3: Clean up old role name fields
         print("\n" + "=" * 60)
-        print("Step 3: Cleaning up users with both 'role' and 'roles'")
+        print("Step 3: Cleaning up old role name fields")
         print("=" * 60)
         
-        query_both = {
+        # Remove 'role' field from users that have role_ids
+        query_old_role = {
             "role": {"$exists": True},
-            "roles": {"$exists": True}
+            "role_ids": {"$exists": True}
         }
         
-        count_both = users_collection.count_documents(query_both)
-        if count_both > 0:
-            print(f"Found {count_both} user(s) with both 'role' and 'roles' fields")
+        count_old_role = users_collection.count_documents(query_old_role)
+        if count_old_role > 0:
+            print(f"Found {count_old_role} user(s) with both 'role' and 'role_ids' fields")
             response = input("Remove old 'role' field from these users? (yes/no): ").strip().lower()
             
             if response in ["yes", "y"]:
                 result = users_collection.update_many(
-                    query_both,
+                    query_old_role,
                     {"$unset": {"role": ""}}
                 )
                 print(f"✓ Removed 'role' field from {result.modified_count} user(s)")
         else:
-            print("✓ No users have both fields")
+            print("✓ No users have both 'role' and 'role_ids' fields")
         
-        # Step 4: Ensure all users have 'roles' field
-        print("\n" + "=" * 60)
-        print("Step 4: Ensuring all users have 'roles' field")
-        print("=" * 60)
-        
-        query_no_roles = {
-            "roles": {"$exists": False}
+        # Remove 'roles' field from users that have role_ids
+        query_old_roles = {
+            "roles": {"$exists": True},
+            "role_ids": {"$exists": True}
         }
         
-        count_no_roles = users_collection.count_documents(query_no_roles)
-        if count_no_roles > 0:
-            print(f"Found {count_no_roles} user(s) without 'roles' field")
-            response = input("Add default 'roles' field (['user']) to these users? (yes/no): ").strip().lower()
+        count_old_roles = users_collection.count_documents(query_old_roles)
+        if count_old_roles > 0:
+            print(f"Found {count_old_roles} user(s) with both 'roles' and 'role_ids' fields")
+            response = input("Remove old 'roles' field from these users? (yes/no): ").strip().lower()
             
             if response in ["yes", "y"]:
                 result = users_collection.update_many(
-                    query_no_roles,
-                    {"$set": {"roles": ["user"]}}
+                    query_old_roles,
+                    {"$unset": {"roles": ""}}
                 )
-                print(f"✓ Added default 'roles' field to {result.modified_count} user(s)")
+                print(f"✓ Removed 'roles' field from {result.modified_count} user(s)")
         else:
-            print("✓ All users have 'roles' field")
+            print("✓ No users have both 'roles' and 'role_ids' fields")
+        
+        # Step 4: Ensure all users have 'role_ids' field
+        print("\n" + "=" * 60)
+        print("Step 4: Ensuring all users have 'role_ids' field")
+        print("=" * 60)
+        
+        query_no_role_ids = {
+            "role_ids": {"$exists": False}
+        }
+        
+        count_no_role_ids = users_collection.count_documents(query_no_role_ids)
+        if count_no_role_ids > 0:
+            # Get user role_id
+            user_role = roles_collection.find_one({"role_name": "user"})
+            if user_role:
+                user_role_id = user_role["_id"]
+                print(f"Found {count_no_role_ids} user(s) without 'role_ids' field")
+                response = input(f"Add default 'role_ids' field ([{user_role_id}]) to these users? (yes/no): ").strip().lower()
+                
+                if response in ["yes", "y"]:
+                    result = users_collection.update_many(
+                        query_no_role_ids,
+                        {"$set": {"role_ids": [user_role_id]}}
+                    )
+                    print(f"✓ Added default 'role_ids' field to {result.modified_count} user(s)")
+            else:
+                print("⚠ Warning: 'user' role not found. Cannot set default role_ids.")
+        else:
+            print("✓ All users have 'role_ids' field")
         
         # Final summary
         print("\n" + "=" * 60)
@@ -244,22 +334,26 @@ def migrate_users():
         print("=" * 60)
         
         total_users = users_collection.count_documents({})
-        users_with_roles = users_collection.count_documents({"roles": {"$exists": True}})
+        users_with_role_ids = users_collection.count_documents({"role_ids": {"$exists": True}})
         users_with_old_role = users_collection.count_documents({"role": {"$exists": True}})
+        users_with_old_roles = users_collection.count_documents({"roles": {"$exists": True}, "role_ids": {"$exists": False}})
         
         print(f"Total users: {total_users}")
-        print(f"Users with 'roles' field: {users_with_roles}")
+        print(f"Users with 'role_ids' field: {users_with_role_ids}")
         print(f"Users with old 'role' field: {users_with_old_role}")
+        print(f"Users with old 'roles' field (without role_ids): {users_with_old_roles}")
         
-        if users_with_roles == total_users and users_with_old_role == 0:
+        if users_with_role_ids == total_users and users_with_old_role == 0 and users_with_old_roles == 0:
             print("\n✓ Migration completed successfully!")
-            print("  All users have been migrated to the new roles system.")
+            print("  All users have been migrated to the new role_ids system.")
         else:
             print("\n⚠ Migration completed with warnings:")
-            if users_with_roles < total_users:
-                print(f"  - {total_users - users_with_roles} user(s) still missing 'roles' field")
+            if users_with_role_ids < total_users:
+                print(f"  - {total_users - users_with_role_ids} user(s) still missing 'role_ids' field")
             if users_with_old_role > 0:
                 print(f"  - {users_with_old_role} user(s) still have old 'role' field")
+            if users_with_old_roles > 0:
+                print(f"  - {users_with_old_roles} user(s) still have old 'roles' field without 'role_ids'")
         
     except ConnectionFailure:
         print("ERROR: Could not connect to MongoDB")
@@ -278,7 +372,13 @@ def migrate_users():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("MongoDB Migration: Migrate to Multiple Roles System")
+    print("MongoDB Migration: Migrate to Role IDs System")
+    print("=" * 60)
+    print("This migration will:")
+    print("  1. Initialize default roles (admin, user)")
+    print("  2. Convert user role names to role_ids (ObjectIds)")
+    print("  3. Remove old role name fields")
+    print("  4. Ensure all users have role_ids")
     print("=" * 60)
     migrate_users()
 

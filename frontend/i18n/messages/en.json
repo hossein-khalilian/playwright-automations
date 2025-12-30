@@ -15,6 +15,7 @@
     "previous": "Previous",
     "open": "Open",
     "create": "Create",
+    "update": "Update",
     "submit": "Submit",
     "upload": "Upload",
     "download": "Download",
@@ -333,7 +334,13 @@
     "deleteCredentialFailed": "Failed to delete credential",
     "loadCredentialsFailed": "Failed to load credentials",
     "deleteConfirm": "Are you sure you want to delete the credential for {email}?",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "editCredential": "Edit Credential",
+    "editCredentialDescription": "Update the password for {email}. Password will be encrypted.",
+    "passwordRequired": "Password is required",
+    "passwordMinLength": "Password must be at least 6 characters long",
+    "updateCredentialFailed": "Failed to update credential",
+    "updating": "Updating..."
   }
 }
 
