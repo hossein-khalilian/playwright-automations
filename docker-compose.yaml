@@ -1,25 +1,31 @@
 services:
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    networks:
+      - backend_net
+
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     env_file:
       - .env
-    restart: always
+    restart: unless-stopped
+    user: "${UID}:${GID}"
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
     command: >
-      sh -c '
-      if [ "$PRODUCTION" = "false" ]; then
-        uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT} --reload;
-      else
-        uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT};
-      fi'
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port ${APP_PORT}
+      --reload
+    depends_on:
+      - redis
     networks:
       - shared_net
       - backend_net
       - proxy
     volumes:
       - ./backend:/app
-      - ./browser_profiles:/browser_profiles
       - shared_tmp:/tmp
     labels:
       - "traefik.enable=true"
@@ -30,28 +36,29 @@ services:
       - "traefik.http.services.automation-backend.loadbalancer.server.port=${APP_PORT}"
 
   worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     env_file:
       - .env
-    restart: always
+    restart: unless-stopped
+    user: "${UID}:${GID}"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     command: >
-      sh -c '
-      if [ "$PRODUCTION" = "false" ]; then
-        watchmedo auto-restart --directory=./ --pattern="*.py" --recursive -- \
-          celery -A app.celery_app worker --loglevel=info --concurrency=2;
-      else
-        celery -A app.celery_app worker --loglevel=info --concurrency=2;
-      fi'
+      watchmedo auto-restart
+      --directory=./
+      --pattern="*.py"
+      --recursive --
+      celery -A app.celery_app worker
+      --loglevel=info
+      --concurrency=2
     depends_on:
       - redis
     networks:
-      - shared_net
       - backend_net
+      - shared_net
     volumes:
       - ./backend:/app
-      - ./browser_profiles:/browser_profiles
       - shared_tmp:/tmp
 
   # flower:
@@ -74,12 +81,6 @@ services:
   #     - "traefik.http.routers.automation-flower.tls.certresolver=le"
   #     - "traefik.http.services.automation-flower.loadbalancer.server.port=${FLOWER_PORT}"
 
-  redis:
-    image: redis:latest
-    restart: always
-    networks:
-      - backend_net
-
   frontend:
     build:
       context: ./frontend
@@ -90,13 +91,9 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
-    command: >
-      sh -c '
-      if [ "$PRODUCTION" = "false" ]; then
-        npm run dev;
-      else
-        npm run start;
-      fi'
+    ports:
+      - "3000:3000"
+    command: npm run dev
     networks:
       - proxy
     labels:

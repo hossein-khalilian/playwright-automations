@@ -545,6 +545,55 @@ def get_decrypted_google_credential_sync(email: str) -> Optional[dict]:
         return None
 
 
+def get_all_working_google_credentials_sync() -> List[dict]:
+    """
+    Get all working Google credentials (sync version for Celery tasks).
+    Returns list of credential dicts with 'email' and 'password' keys.
+    """
+    from app.utils.encryption import decrypt_password
+    
+    mongo_uri = config.get("mongo_uri")
+    if not mongo_uri:
+        return []
+    
+    db_name = config.get("mongo_db_name", "playwright_automations")
+    client = None
+    
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        db = client[db_name]
+        collection = db["google_credentials"]
+        
+        # Get all active credentials with status="working"
+        cursor = collection.find({
+            "is_active": True,
+            "status": "working"
+        }).sort("created_at", -1)
+        
+        credentials = []
+        for cred_doc in cursor:
+            try:
+                encrypted_password = cred_doc.get("encrypted_password")
+                if not encrypted_password:
+                    continue
+                
+                decrypted_password = decrypt_password(encrypted_password)
+                credentials.append({
+                    "email": cred_doc.get("email"),
+                    "password": decrypted_password,
+                })
+            except Exception:
+                # Skip credentials that can't be decrypted
+                continue
+        
+        return credentials
+    except Exception:
+        return []
+    finally:
+        if client is not None:
+            client.close()
+
+
 def update_google_credential_sync(
     email: str,
     encrypted_password: Optional[str] = None,

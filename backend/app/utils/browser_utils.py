@@ -13,7 +13,8 @@ from playwright.sync_api import sync_playwright
 from app.utils.google import check_google_login_status_sync
 from app.utils.system_resolution import get_system_resolution
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+# This file is at backend/app/utils/, so parents[2] is backend/
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 def setup_stealth_mode_sync(context: SyncBrowserContext, page: SyncPage) -> None:

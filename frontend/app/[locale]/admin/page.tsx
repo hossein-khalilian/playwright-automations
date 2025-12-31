@@ -531,7 +531,7 @@ export default function AdminDashboardPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('editCredential')}</DialogTitle>
-            <DialogDescription>{t('editCredentialDescription', { email: editingEmail })}</DialogDescription>
+            <DialogDescription>{t('editCredentialDescription', { email: editingEmail || '' })}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

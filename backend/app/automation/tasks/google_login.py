@@ -115,6 +115,75 @@ def login_to_google_sync(
         return False
 
 
+def add_google_account_via_addsession_sync(
+    page: SyncPage,
+    email: str,
+    password: str,
+) -> bool:
+    """
+    Add a Google account to the current session using AddSession flow.
+    This allows multiple accounts to be added to the same browser profile.
+    """
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info(f"Adding Google account {email} using AddSession flow...")
+        
+        # Navigate to AddSession URL
+        add_session_url = "https://accounts.google.com/v3/signin/identifier?flowName=GlifWebSignIn&flowEntry=AddSession"
+        logger.info(f"Navigating to AddSession URL...")
+        page.goto(add_session_url, wait_until="domcontentloaded", timeout=60_000)
+        
+        # Enter email
+        logger.info("Entering email...")
+        email_input = page.get_by_role("textbox", name=re.compile("email|phone", re.IGNORECASE))
+        email_input.wait_for(timeout=15_000, state="visible")
+        email_input.click()
+        _type_with_human_delay_sync(email_input, email)
+        _click_next_button_sync(page)
+        
+        # Wait for password field
+        logger.info("Waiting for password field...")
+        time.sleep(2)  # Give page time to load
+        
+        # Enter password
+        logger.info("Entering password...")
+        password_input = page.get_by_role("textbox", name=re.compile("password", re.IGNORECASE))
+        password_input.wait_for(timeout=20_000, state="visible")
+        password_input.click()
+        _type_with_human_delay_sync(password_input, password)
+        _click_next_button_sync(page)
+        
+        # Wait for account to be added
+        logger.info("Waiting for account to be added...")
+        page.wait_for_load_state("networkidle", timeout=60_000)
+        time.sleep(2)  # Give additional time for account to be added
+        
+        # Verify account was added by checking if we're redirected or can see account info
+        current_url = page.url
+        logger.info(f"Current URL after AddSession: {current_url}")
+        
+        # If we're redirected to Gmail or account page, it likely succeeded
+        if "mail.google.com" in current_url or "myaccount.google.com" in current_url or "accounts.google.com" not in current_url:
+            logger.info(f"Successfully added Google account {email}")
+            return True
+        
+        # Also check if we can see the account in the account switcher or similar
+        # For now, if we're not on the login page, assume success
+        if "signin" not in current_url.lower() and "identifier" not in current_url.lower():
+            logger.info(f"Successfully added Google account {email} (based on URL)")
+            return True
+        
+        logger.warning(f"AddSession flow completed but verification unclear for {email}")
+        return False
+        
+    except Exception as exc:
+        logger.error(f"Error adding Google account {email} via AddSession: {exc}", exc_info=True)
+        return False
+
+
 def main(user_profile_name: str = "test_google_login", headless: bool = False):
     print("[*] Initializing browser...")
     page = None

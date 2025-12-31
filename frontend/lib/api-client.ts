@@ -603,8 +603,6 @@ import type {
   GoogleCredentialListResponse,
   GoogleCredentialUpdateRequest,
   GoogleCredentialUpdateResponse,
-  TaskSubmissionResponse,
-  TaskStatusResponse,
 } from './types';
 
 export const adminApi = {

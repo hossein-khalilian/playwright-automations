@@ -45,12 +45,23 @@ app.include_router(api_router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize default roles and permissions on application startup."""
+    import os
+
+    # Ensure PLAYWRIGHT_BROWSERS_PATH is set to system-wide location
+    if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/ms-playwright"
+        logger.info(f"Set PLAYWRIGHT_BROWSERS_PATH to /ms-playwright")
+
     logger.info("Initializing default roles and permissions...")
     success = await initialize_default_roles_and_permissions()
     if success:
         logger.info("Default roles and permissions initialized successfully")
     else:
         logger.warning("Failed to initialize default roles and permissions")
+
+    # Note: Browser profile initialization is handled by the Celery worker,
+    # not by the FastAPI backend. This ensures Playwright operations are
+    # only performed in the worker process.
 
 
 @app.get("/health")

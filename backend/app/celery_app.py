@@ -27,8 +27,10 @@ celery_app.conf.update(
 def initialize_browser_pool_on_worker_start(sender, **kwargs):
     """
     Initialize browser pool when Celery worker starts.
+    First, login to all working Google credentials and copy browser profiles.
+    Then, create browser pool using those profiles.
     Each browser in the pool will have its own separate browser profile.
-    Profile names will be: {user_profile_name}_0, {user_profile_name}_1, etc.
+    Profile names will be: {user_profile_name}_{email_safe}_0, {user_profile_name}_{email_safe}_1, etc.
     """
     try:
         # Get configuration from environment variables
@@ -41,12 +43,39 @@ def initialize_browser_pool_on_worker_start(sender, **kwargs):
             pool_size = 1
 
         logger.info(
-            f"[Celery Worker] Initializing browser pool with {pool_size} browsers "
-            f"(base profile: {user_profile_name}, headless: {headless})"
+            f"[Celery Worker] Starting browser pool initialization "
+            f"(base profile: {user_profile_name}, headless: {headless}, pool_size: {pool_size})"
         )
+
+        # First, initialize browser profiles for all working credentials
+        # This will login to each credential (if not already logged in) and copy profiles
         logger.info(
-            f"[Celery Worker] Each browser will have its own profile: "
-            f"{user_profile_name}_0, {user_profile_name}_1, ..."
+            "[Celery Worker] Initializing browser profiles for all working Google credentials..."
+        )
+        from app.utils.browser_profile_manager import (
+            initialize_browser_profiles_for_credentials,
+        )
+
+        try:
+            initialized_profiles = initialize_browser_profiles_for_credentials(
+                base_profile_name=user_profile_name,
+                pool_size=pool_size,
+                headless=headless,
+            )
+            logger.info(
+                f"[Celery Worker] Initialized {len(initialized_profiles)} browser profiles"
+            )
+        except Exception as e:
+            logger.error(
+                f"[Celery Worker] Error initializing browser profiles: {e}",
+                exc_info=True,
+            )
+            logger.warning(
+                "[Celery Worker] Continuing with browser pool initialization..."
+            )
+
+        logger.info(
+            f"[Celery Worker] Initializing browser pool with {pool_size} browsers"
         )
 
         pages = []
@@ -56,9 +85,8 @@ def initialize_browser_pool_on_worker_start(sender, **kwargs):
         from playwright.sync_api import sync_playwright
         from pathlib import Path
         
-        # Calculate BASE_DIR: celery_app.py is at backend/app/, so parents[2] is project root
-        # browser_utils.py uses parents[3] because it's in backend/app/utils/
-        BASE_DIR = Path(__file__).resolve().parents[2]
+        # Calculate BASE_DIR: celery_app.py is at backend/app/, so parents[1] is backend/
+        BASE_DIR = Path(__file__).resolve().parents[1]
         
         playwright = sync_playwright().start()
         
